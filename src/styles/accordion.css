@@ -1,0 +1,65 @@
+/* Styles pour l'accordéon utilisé dans Dashboard */
+
+.accordion-section {
+  width: 100%;
+  margin-bottom: 12px;
+  border-radius: 10px;
+  overflow: visible;
+}
+
+/* header cliquable */
+.accordion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #ffffff;
+  border: 1px solid rgba(20,30,50,0.06);
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(15,30,60,0.04);
+  cursor: pointer;
+  user-select: none;
+  transition: box-shadow .18s ease, transform .08s ease;
+}
+.accordion-header:active { transform: translateY(1px); }
+.accordion-header:focus { outline: 3px solid rgba(100,150,255,0.18); }
+
+/* titre */
+.accordion-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #0f1724;
+}
+
+/* chevron animé */
+.chevron {
+  font-size: 14px;
+  color: #4b5563;
+  transition: transform .18s ease;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width: 22px;
+}
+.chevron.open {
+  transform: rotate(180deg);
+}
+
+/* contenu de l'accordéon */
+.accordion-content {
+  margin-top: 10px;
+  padding: 14px;
+  background: #ffffff;
+  border-radius: 10px;
+  border: 1px solid rgba(20,30,50,0.04);
+  box-shadow: 0 4px 18px rgba(15,30,60,0.04);
+  animation: fadeIn .14s ease;
+}
+
+/* petit effet d'apparition */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
