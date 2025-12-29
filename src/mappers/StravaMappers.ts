@@ -50,11 +50,15 @@ export function mapStravaToDetails(
     distance_m: raw.distance ?? 0,
     duration_s: raw.moving_time ?? 0,
     elevation_m: raw.total_elevation_gain ?? undefined,
+    max_elevation: raw.elev_high ?? undefined,
+    min_elevation: raw.elev_low ?? undefined,
 
     avg_speed_ms: raw.average_speed ?? undefined,
     max_speed_ms: raw.max_speed ?? undefined,
     avg_watts: raw.average_watts ?? undefined,
     energy_kj: raw.kilojoules ?? undefined,
+    avg_hrt: raw.average_heartrate ?? undefined,
+    max_hrt: raw.max_heartrate ?? undefined,
 
     has_gps: !!raw.map?.summary_polyline,
     has_streams: false,

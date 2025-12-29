@@ -48,6 +48,12 @@ function ActivityPage() {
         distance_m: a.distance_m,
         duration_s: a.duration_s,
         elevation_m: a.elevation_m,
+        // ajoutés :
+        max_elevation: d.max_elevation ?? null,
+        min_elevation: d.min_elevation ?? null,
+        avg_hrt: d.avg_hrt ?? null,
+        max_hrt: d.max_hrt ?? null,
+
         avg_speed_ms: a.avg_speed_ms ?? null,
         max_speed_ms: a.max_speed_ms ?? null,
         avg_watts: a.avg_watts ?? null,
@@ -119,9 +125,10 @@ function ActivityPage() {
     return coordinates
   }
 
-  // Crée un path SVG simple à partir d'une polyline ou de start/end
   const MiniMap = ({ polyline, startLatLng, endLatLng }: { polyline?: string | null, startLatLng?: [number,number] | null, endLatLng?: [number,number] | null }) => {
-    const width = 340, height = 220, pad = 8
+    const maxWidth = 340
+    const height = 220
+    const pad = 8
 
     let points: [number, number][] = []
     if (polyline) {
@@ -145,7 +152,7 @@ function ActivityPage() {
     const lngRangeNonZero = (maxLng - minLng) || 0.0001
 
     const coords = points.map(([lat, lng]) => {
-      const x = pad + ((lng - minLng) / lngRangeNonZero) * (width - pad * 2)
+      const x = pad + ((lng - minLng) / lngRangeNonZero) * (maxWidth - pad * 2)
       const y = pad + (1 - (lat - minLat) / latRangeNonZero) * (height - pad * 2)
       return [x, y]
     })
@@ -156,7 +163,8 @@ function ActivityPage() {
       <div
         className="mini-map card"
         style={{
-          width,
+          width: "100%",
+          maxWidth,
           height,
           padding: 8,
           position: "relative",
@@ -165,12 +173,10 @@ function ActivityPage() {
           background: "linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01))"
         }}
       >
-        {/* Semi-transparent overlay to increase contrast with SVG */}
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(0,0,0,0.12), rgba(0,0,0,0.12))" }} />
-        <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} xmlns="http://www.w3.org/2000/svg" style={{ position: "relative", display: "block" }}>
-          <rect x="0" y="0" width={width} height={height} fill="transparent" rx="8" />
+        <svg width="100%" height="100%" viewBox={`0 0 ${maxWidth} ${height}`} xmlns="http://www.w3.org/2000/svg" style={{ position: "relative", display: "block" }}>
+          <rect x="0" y="0" width={maxWidth} height={height} fill="transparent" rx="8" />
           <path d={d} stroke="#60a5fa" strokeWidth={3} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-          {/* start / end markers */}
           {coords[0] && <circle cx={coords[0][0]} cy={coords[0][1]} r={4} fill="#10b981" stroke="#00000055" strokeWidth={1} />}
           {coords.length > 1 && <circle cx={coords[coords.length-1][0]} cy={coords[coords.length-1][1]} r={4} fill="#f59e0b" stroke="#00000055" strokeWidth={1} />}
         </svg>
@@ -206,19 +212,31 @@ function ActivityPage() {
         <div className="card main-content">
           <h3 style={{ marginTop: 0 }}>{activity.sport} — {activity.startDate.toLocaleDateString()}</h3>
 
-          <p><strong>Distance :</strong> {(activity.distance_m / 1000).toFixed(2)} km</p>
-          <p><strong>Durée :</strong> {formatDuration(activity.duration_s)}</p>
-          <p><strong>D+ :</strong> {activity.elevation_m} m</p>
+          {/* Distance et durée (gardés visibles si présents) */}
+          {activity.distance_m != null && <p><strong>Distance :</strong> {(activity.distance_m / 1000).toFixed(2)} km</p>}
+          {activity.duration_s != null && <p><strong>Durée :</strong> {formatDuration(activity.duration_s)}</p>}
 
-          <p><strong>Vitesse moyenne :</strong> {activity.avg_speed_ms != null ? (activity.avg_speed_ms * 3.6).toFixed(2) : "-"} km/h</p>
-          <p><strong>Puissance moyenne :</strong> {activity.avg_watts !== null ? activity.avg_watts : "-"} W</p>
-          <p><strong>Énergie :</strong> {activity.energy_kj !== null ? activity.energy_kj : "-"} kJ</p>
+          {/* Élévations / altitudes : afficher seulement si chaque valeur existe */}
+          {activity.elevation_m != null && <p><strong>D+ :</strong> {activity.elevation_m} m</p>}
+          {activity.max_elevation != null && <p><strong>Altitude maximale :</strong> {activity.max_elevation} m</p>}
+          {activity.min_elevation != null && <p><strong>Altitude minimale :</strong> {activity.min_elevation} m</p>}
 
-          <div style={{ marginTop: 12 }}>
-            <strong>Localisation</strong>
-            <p className="small">{startCity ? `Départ : ${startCity}` : "Départ : —"}</p>
-            <p className="small">{endCity ? `Arrivée : ${endCity}` : "Arrivée : —"}</p>
-          </div>
+          {/* Vitesses / puissance / énergie / FC : afficher seulement si valeurs présentes */}
+          {activity.avg_speed_ms != null && <p><strong>Vitesse moyenne :</strong> {(activity.avg_speed_ms * 3.6).toFixed(2)} km/h</p>}
+          {activity.max_speed_ms != null && <p><strong>Vitesse maximale :</strong> {(activity.max_speed_ms * 3.6).toFixed(2)} km/h</p>}
+          {activity.avg_watts != null && <p><strong>Puissance moyenne :</strong> {activity.avg_watts} W</p>}
+          {activity.energy_kj != null && <p><strong>Énergie :</strong> {activity.energy_kj} kJ</p>}
+          {activity.avg_hrt != null && <p><strong>FC moyenne :</strong> {activity.avg_hrt} bpm</p>}
+          {activity.max_hrt != null && <p><strong>FC maximale :</strong> {activity.max_hrt} bpm</p>}
+
+          {/* Localisation : n'afficher la section que si au moins une ville existe */}
+          {(startCity || endCity) && (
+            <div style={{ marginTop: 12 }}>
+              <strong>Localisation</strong>
+              {startCity && <p className="small">Départ : {startCity}</p>}
+              {endCity && <p className="small">Arrivée : {endCity}</p>}
+            </div>
+          )}
 
           {activity.polyline && (
             <div style={{ marginTop: 12 }}>
@@ -231,20 +249,30 @@ function ActivityPage() {
         <aside className="sidebar">
           <div className="card" style={{ padding:12 }}>
             <MiniMap polyline={activity.polyline ?? null} startLatLng={activity.startLatLng ?? null} endLatLng={activity.endLatLng ?? null} />
-            <div style={{ marginTop:10, display:"flex", justifyContent:"space-between" }}>
-              <div>
-                <div className="small">Vitesse moyenne</div>
-                <strong>{activity.avg_speed_ms != null ? (activity.avg_speed_ms*3.6).toFixed(1) : "-" } km/h</strong>
+
+            {/* Sidebar metrics : n'afficher la rangée que si au moins une métrique existe */}
+            {(activity.avg_speed_ms != null || activity.avg_watts != null || activity.energy_kj != null) && (
+              <div style={{ marginTop:10, display:"flex", justifyContent:"space-between" }}>
+                {activity.avg_speed_ms != null && (
+                  <div>
+                    <div className="small">Vitesse moyenne</div>
+                    <strong>{(activity.avg_speed_ms*3.6).toFixed(1)} km/h</strong>
+                  </div>
+                )}
+                {activity.avg_watts != null && (
+                  <div>
+                    <div className="small">Puissance</div>
+                    <strong>{activity.avg_watts} W</strong>
+                  </div>
+                )}
+                {activity.energy_kj != null && (
+                  <div>
+                    <div className="small">Énergie</div>
+                    <strong>{activity.energy_kj} kJ</strong>
+                  </div>
+                )}
               </div>
-              <div>
-                <div className="small">Puissance</div>
-                <strong>{activity.avg_watts ?? "-" } W</strong>
-              </div>
-              <div>
-                <div className="small">Énergie</div>
-                <strong>{activity.energy_kj ?? "-"} kJ</strong>
-              </div>
-            </div>
+            )}
           </div>
 
           <div className="card" style={{ padding:12 }}>

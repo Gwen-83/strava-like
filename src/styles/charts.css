@@ -1,0 +1,82 @@
+/* Container stacking and spacing */
+.charts-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* Card style for charts */
+.chart-card {
+  width: 100%;
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 8px 22px rgba(2,6,23,0.5);
+  border: 1px solid rgba(255,255,255,0.03);
+}
+
+/* Headings inside cards */
+.chart-card h3 {
+  margin: 0 0 10px 0;
+  font-size: 16px;
+  color: var(--text);
+}
+
+/* Recharts text styling for better contrast */
+.recharts-cartesian-axis-tick text {
+  fill: var(--muted);
+  font-size: 12px;
+}
+.recharts-legend-item text {
+  fill: var(--text);
+  font-size: 13px;
+}
+.recharts-tooltip-wrapper {
+  font-size: 13px;
+}
+
+/* Make charts more compact on small screens */
+@media (max-width:900px) {
+  .chart-card { padding: 12px }
+  .chart-card h3 { font-size: 15px }
+}
+
+/* Tooltip dark theme for better contrast */
+.recharts-tooltip-wrapper,
+.recharts-tooltip-wrapper .recharts-default-tooltip,
+.recharts-tooltip-wrapper .recharts-tooltip,
+.recharts-tooltip-wrapper .recharts-tooltip-inner {
+  background: rgba(6, 8, 20, 0.95) !important;
+  color: var(--text) !important;
+  border: 1px solid rgba(255,255,255,0.06) !important;
+  box-shadow: 0 6px 20px rgba(2,6,23,0.6) !important;
+  border-radius: 8px !important;
+  padding: 8px 10px !important;
+  font-size: 13px !important;
+}
+
+/* Label (date) */
+.recharts-tooltip-wrapper .recharts-tooltip-label {
+  color: var(--text) !important;
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+/* Items (series name + value) */
+.recharts-tooltip-wrapper .recharts-tooltip-item,
+.recharts-tooltip-wrapper .recharts-tooltip-item-list,
+.recharts-tooltip-wrapper .recharts-tooltip-item-name,
+.recharts-tooltip-wrapper .recharts-tooltip-item-value {
+  color: var(--text) !important;
+  font-size: 13px;
+}
+
+/* Value emphasis (keep value readable) */
+.recharts-tooltip-wrapper .recharts-tooltip-item-value {
+  color: var(--muted) !important;
+  font-weight: 700;
+}

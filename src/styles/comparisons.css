@@ -1,0 +1,217 @@
+/* Comparisons page layout */
+.comparisons-page {
+  padding: 18px;
+  color: var(--text-color, #fff);
+  font-family: inherit;
+}
+
+/* Controls */
+.controls-header {
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.controls-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: start;
+}
+.controls-title {
+  margin: 0 0 8px 0;
+  font-size: 1rem;
+  color: #fff;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+.filter-item {
+  display: flex;
+  flex-direction: column;
+  min-width: 140px;
+}
+.filter-item label {
+  font-size: 0.82rem;
+  color: #fff;
+  margin-bottom: 6px;
+}
+.filter-item select,
+.filter-item input[type="date"] {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.03);
+  color: #fff;
+  min-width: 140px;
+}
+
+/* Hint under filters */
+.filters-hint {
+  margin-top: 8px;
+  color: rgba(255,255,255,0.75);
+}
+
+/* Range / badges */
+.range-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+}
+.badge {
+  background: rgba(255,255,255,0.04);
+  color: #fff;
+  font-size: 0.85rem;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.04);
+}
+.badge.muted {
+  opacity: 0.8;
+  background: transparent;
+  border-style: dashed;
+}
+.badge.scope {
+  margin-top: 6px;
+  font-weight: 600;
+}
+
+/* Stats */
+.section-title {
+  margin: 8px 0 12px 0;
+  font-size: 0.95rem;
+  color: #fff;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.stat-card {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.04);
+  border-radius: 10px;
+  padding: 16px;
+  text-align: left;
+  min-height: 72px;
+}
+.stat-label {
+  font-size: 0.85rem;
+  color: rgba(255,255,255,0.85);
+}
+.stat-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-top: 8px;
+}
+
+/* Comparisons */
+.comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+.comparison-card {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.04);
+  border-radius: 10px;
+  padding: 14px;
+  min-height: 88px;
+}
+.card-label {
+  font-size: 0.85rem;
+  color: rgba(255,255,255,0.85);
+}
+.card-value {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin-top: 8px;
+}
+.card-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+}
+.meta-small {
+  font-size: 0.82rem;
+  color: rgba(255,255,255,0.75);
+}
+
+/* Delta styling */
+.delta {
+  font-weight: 700;
+  font-size: 0.95rem;
+  padding: 4px 8px;
+  border-radius: 999px;
+}
+.delta.pos {
+  color: #d4f7dc;
+  background: rgba(40,167,69,0.12);
+}
+.delta.neg {
+  color: #ffd4d7;
+  background: rgba(220,53,69,0.10);
+}
+
+/* Responsive */
+@media (max-width: 880px) {
+  .controls-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .range-panel {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .stats-grid, .comparison-grid {
+    grid-template-columns: 1fr;
+  }
+  .filters {
+    gap: 10px;
+  }
+  .filter-item {
+    min-width: 100%;
+  }
+}
+
+/* Amélioration des <select> pour meilleure lisibilité et intégration DA */
+.filter-item select,
+.filter-item input[type="date"] {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background: rgba(255,255,255,0.06);
+  color: #ffffff;
+  border: 1px solid rgba(255,255,255,0.12);
+  padding: 8px 36px 8px 10px;
+  border-radius: 8px;
+  min-width: 140px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12'><path d='M2 4l4 4 4-4' stroke='%23ffffff' fill='none' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 12px;
+}
+
+/* Focus accessible */
+.filter-item select:focus,
+.filter-item input[type="date"]:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.2);
+}
+
+/* Options (limité par le rendu natif, mais utile sur certains navigateurs) */
+.filter-item select option {
+  background: #111216;
+  color: #ffffff;
+}

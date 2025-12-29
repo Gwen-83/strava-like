@@ -11,6 +11,7 @@ function StravaCallback() {
   const navigate = useNavigate()
 
   useEffect(() => {
+    console.log("STRAVA CALLBACK MOUNTED")
     const params = new URLSearchParams(window.location.search)
     const code = params.get("code")
     if (!code) return
@@ -28,6 +29,7 @@ function StravaCallback() {
       const potentialSuspects: { raw: any; summary: any; reasons: string[] }[] = []
 
       for (const raw of data.activities) {
+      console.log("[STRAVA PAYLOAD ACTIVITY]",JSON.stringify(raw, null, 2))
       const startDate = new Date(raw.start_date)
 
       console.log("[import] processing activity", {

@@ -16,12 +16,15 @@ export type ActivitySummary = {
   distance_m: number
   // D+ peut être absent → ne pas mentir avec 0
   elevation_m?: number | null
+  max_elevation?:number | null
+  min_elevation?:number | null
 
   avg_speed_ms?: number | null
   max_speed_ms?: number | null
   avg_watts?: number | null
   energy_kj?: number | null
-  // Charge d'entraînement peut être absente
+  avg_hrt?: number | null
+  max_hrt?: number | null
   load?: number | null
 
   has_gps: boolean
