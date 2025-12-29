@@ -47,7 +47,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const perPage = 50
     let allActivities: any[] = []
 
-    while (true) {
+    const MAX_PAGES = 10
+    while (page <= MAX_PAGES) {
       const activitiesRes = await axios.get(
         "https://www.strava.com/api/v3/athlete/activities",
         {
@@ -64,26 +65,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (activitiesRes.data.length === 0) break
 
       allActivities.push(...activitiesRes.data)
-      console.log(
-        "STRAVA ACTIVITY FULL",
-        JSON.stringify(activitiesRes.data, null, 2)
-      )
-      logImport(
-        "INFO",
-        `Fetched activities page ${page}`,
-        { count: activitiesRes.data.length }
-      )
-      page++
-    }
+      console.log("STRAVA page", page, "count", activitiesRes.data.length)
 
-    for (const act of activitiesRes.data) {
-      if (act.distance > 400_000 || act.moving_time > 86_400) {
-        logImport("WARN", "Suspicious activity from Strava", {
-          id: act.id,
-          distance: act.distance,
-          duration: act.moving_time,
-        })
-      }
+      page++
     }
 
     // 3️⃣ On renvoie tout au frontend

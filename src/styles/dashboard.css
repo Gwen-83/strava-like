@@ -1,190 +1,191 @@
-/* Layout général */
-.dashboard {
-  min-height: 100vh;
-  background: linear-gradient(180deg, #f5f7fb 0%, #f3f6fb 100%);
-  padding: 32px 20px;
-  display: flex;
-  justify-content: center; /* centre horizontalement le conteneur */
-  align-items: flex-start;
-  font-family: Inter, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  color: #0f1724;
+/* Layout principal */
+.dashboard{
+  width:100%;
+  display:flex;
+  justify-content:center;
+}
+.dashboard-inner{
+  width:100%;
+  max-width:1200px;
+  margin:0 auto;
+  padding:20px;
 }
 
-/* conteneur central */
-.dashboard-inner {
+/* Header */
+.dashboard-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:18px;
+}
+.header-title{
+  font-weight:700;
+  color:var(--text);
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+/* Actions */
+.dashboard-actions{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  margin-bottom:18px;
+}
+
+/* Grid layout */
+.dashboard-grid{
+  display:grid;
+  grid-template-columns: 1.4fr 0.8fr;
+  grid-template-rows: auto auto;
+  gap:16px;
+}
+
+/* Charts area spans left column */
+.charts-grid{
+  display:grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap:12px;
+}
+@media (max-width:900px){
+  .dashboard-grid{ grid-template-columns: 1fr; }
+  .charts-grid{ grid-template-columns: 1fr; }
+}
+
+/* Cards */
+.chart-card, .stat-card, .comparison-card, .activity-card, .card{
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  border-radius:12px;
+  padding:14px;
+  border:1px solid rgba(255,255,255,0.03);
+  box-shadow: 0 8px 24px rgba(2,6,23,0.55);
+}
+
+/* Chart card headers */
+.chart-card h3{
+  font-size:14px;
+  margin-bottom:10px;
+  color:var(--muted);
+}
+
+/* Stats */
+.stats-section{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.stat-card{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:14px;
+}
+.stat-card strong{ font-size:18px }
+
+/* Comparisons */
+.comparison-grid{
+  display:flex;
+  gap:10px;
+}
+.comparison-card{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  padding:12px;
+}
+.comparison-card small{ color:var(--muted) }
+
+/* Activities list */
+.activities-list{
+  list-style:none;
+  padding:0;
+  margin:0;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.activity-card{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:12px;
+  cursor:pointer;
+  transition: background .12s ease, transform .08s ease;
+}
+.activity-card:hover{
+  background: linear-gradient(90deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02));
+  transform: translateY(-4px);
+}
+.activity-card strong{ display:block; font-size:14px }
+.activity-card span{ color:var(--muted); font-size:13px }
+.activity-card small{ color:var(--muted); }
+
+/* AccordionSection minimal visuals (if plain wrapper) */
+.accordion-section{ margin-bottom:12px }
+
+/* Detail overlay */
+.activity-detail-overlay{
+  position:fixed;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  /* plus sombre et flou pour lisibilité */
+  background: rgba(2,6,23,0.86);
+  backdrop-filter: blur(6px);
+  z-index:60;
+}
+.activity-detail-card{
+  width:95%;
+  max-width:720px;
+  padding:18px;
+  border-radius:14px;
+  /* fond plus opaque et lisible */
+  background: linear-gradient(180deg, rgba(11,18,32,0.95), rgba(11,18,32,0.9));
+  border:1px solid rgba(255,255,255,0.04);
+  box-shadow: 0 28px 60px rgba(2,6,23,0.85);
+  color: var(--text);
+}
+
+/* Buttons inside card */
+.activity-detail-card button{ margin-top:12px }
+
+/* When overlay contains a map, make it stand out */
+.activity-detail-card .detail-map {
   width: 100%;
-  max-width: 1100px;
+  height: 320px;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-top: 12px;
+  background: rgba(0,0,0,0.35);
 }
 
-/* entête */
-.dashboard-header {
-  margin-bottom: 14px;
-}
-.header-title {
-  margin: 0;
-  font-size: 1.4rem;
-  font-weight: 700;
-  color: #0b1220;
-}
+/* Misc */
+.header-actions{ display:flex; gap:8px; align-items:center }
+.sort, .import{ height:38px }
 
-/* actions (select + import) */
-.dashboard-actions {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  margin: 12px 0 22px;
-}
+/* Select "sort" — harmonisation DA */
 .sort {
-  appearance: none;
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: 1px solid rgba(15,25,40,0.08);
-  background: #fff;
-  box-shadow: 0 1px 4px rgba(10,20,40,0.03);
-  font-size: 0.95rem;
-}
-.import {
-  padding: 8px 12px;
-  background: #2563eb;
-  color: #fff;
-  border: none;
-  border-radius: 8px;
+  height: 38px;
+  border-radius: 10px;
+  color: var(--text);
+  border: solid 1px rgba(96,165,250,0.12);
+  font: inherit;
   cursor: pointer;
-  font-weight: 600;
-  box-shadow: 0 6px 18px rgba(37,99,235,0.12);
-}
-.import:hover { filter: brightness(.98); }
-.import:focus { outline: 3px solid rgba(37,99,235,0.18); }
-
-/* grille principale : colonnes centrées (sections empilées mais contiguës) */
-.dashboard-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  align-items: center; /* centre chaque section horizontalement */
+  transition: transform .08s ease, box-shadow .12s ease;
 }
 
-/* --- Charts --- */
-.charts-grid {
-  width: 100%;
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 16px;
-}
-.chart-card {
-  background: #fff;
-  padding: 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(15,25,40,0.04);
-  box-shadow: 0 6px 18px rgba(3,10,30,0.04);
-}
-.chart-card h3 {
-  margin: 0 0 8px 0;
-  font-size: 0.95rem;
+.sort:focus {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(96,165,250,0.12);
+  transform: translateY(-1px);
 }
 
-/* --- Stats --- */
-.stats-section {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-  flex-wrap: wrap;
-  width: 100%;
-}
-.stat-card {
-  background: #fff;
-  padding: 14px;
-  border-radius: 10px;
-  min-width: 160px;
-  width: 100%;
-  max-width: 220px;
-  text-align: left;
-  box-shadow: 0 6px 18px rgba(3,10,30,0.04);
-  border: 1px solid rgba(15,25,40,0.04);
-}
-.stat-card span { display:block; color:#6b7280; font-size:0.85rem; }
-.stat-card strong { display:block; margin-top:6px; font-size:1.15rem; color:#0b1220; }
-
-/* --- Comparaisons hebdo --- */
-.comparison-grid {
-  width: 100%;
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-  flex-wrap: wrap;
-}
-.comparison-card {
-  background: #fff;
-  padding: 12px;
-  border-radius: 10px;
-  min-width: 160px;
-  max-width: 240px;
-  width: 100%;
-  border: 1px solid rgba(15,25,40,0.04);
-  box-shadow: 0 6px 18px rgba(3,10,30,0.04);
-}
-.comparison-card span { color:#6b7280; display:block; }
-.comparison-card strong { font-size:1rem; display:block; margin-top:6px; }
-.comparison-card small { color:#6366f1; display:block; margin-top:6px; }
-
-/* --- Liste d'activités --- */
-.activities-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.activity-card {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  padding: 12px;
-  background: linear-gradient(180deg,#ffffff,#fbfdff);
-  border-radius: 10px;
-  border: 1px solid rgba(15,25,40,0.04);
-  box-shadow: 0 8px 18px rgba(3,10,30,0.03);
-  cursor: pointer;
-}
-.activity-card:hover { transform: translateY(-3px); transition: transform .12s ease; }
-.activity-card strong { font-size: 0.95rem; }
-.activity-card span { color: #6b7280; }
-
-/* overlay détail activité */
-.activity-detail-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(5,10,20,0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  z-index: 60;
-}
-.activity-detail-card {
-  width: 100%;
-  max-width: 520px;
-  background: #fff;
-  padding: 18px;
-  border-radius: 12px;
-  border: 1px solid rgba(15,25,40,0.05);
-  box-shadow: 0 20px 50px rgba(3,10,30,0.4);
-}
-.activity-detail-card h4 { margin-top: 0; }
-
-/* small screens -> responsive layout */
-@media (min-width: 720px) {
-  .charts-grid { grid-template-columns: repeat(2, 1fr); }
-}
-@media (min-width: 1200px) {
-  .charts-grid { grid-template-columns: repeat(3, 1fr); }
-}
-
-/* accessibility helpers */
-button:focus, .import:focus, .sort:focus, .activity-card:focus {
-  outline: 3px solid rgba(99,102,241,0.16);
-  outline-offset: 2px;
+/* Option list readable when opened */
+.sort option {
+  color: #111;
+  background: rgba(96,165,250,0.12);
 }

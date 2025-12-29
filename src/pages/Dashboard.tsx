@@ -7,6 +7,7 @@ import {groupByWeek, groupElevationByMonth, trainingLoad} from "../utils/aggrega
 import { compareWeeks } from "../utils/comparisons";
 import AccordionSection from "../components/AccordionSection";
 import "../styles/dashboard.css";
+import "../styles/global.css";
 import { useNavigate } from "react-router-dom";
 
 // Calcul simple de stats (tolérant sur données manquantes)
@@ -72,6 +73,7 @@ function Dashboard() {
     )
 
     const unsubscribe = onSnapshot(q, snapshot => {
+      console.info("[ACTIVITIES] total docs from Firestore:", snapshot.docs.length)
       const acts = snapshot.docs.map(doc => {
         try {
           const data = doc.data()
@@ -90,7 +92,11 @@ function Dashboard() {
           return null
         }
       }).filter(Boolean) as ActivitySummary[]
-
+      console.group("Firestore snapshot")
+      console.log("Total docs in snapshot:", snapshot.size)
+      console.log("Parsed activities count:", acts.length)
+      console.log("IDs:", acts.map(a => a.id))
+      console.groupEnd()
       
       setActivities(acts)
     })

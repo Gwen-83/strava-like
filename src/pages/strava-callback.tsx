@@ -28,52 +28,73 @@ function StravaCallback() {
       const potentialSuspects: { raw: any; summary: any; reasons: string[] }[] = []
 
       for (const raw of data.activities) {
-        const startDate = new Date(raw.start_date)
+      const startDate = new Date(raw.start_date)
 
-        if (lastImport && startDate <= lastImport) continue
+      console.log("[import] processing activity", {
+        external_id: raw.id ?? raw.external_id ?? null,
+        name: raw.name ?? null,
+        start_date: raw.start_date
+      })
 
-        const summary = mapStravaToSummary(raw, userId)
+      if (lastImport && startDate <= lastImport) {
+        console.log("[import] skipping - older than last import", { startDate, lastImport })
+        continue
+      }
 
-        // Vérifier suspicion avant insertion
-        try {
-          const suspectRes = analyzeActivitySuspicion({
-            sport: summary.sport,
-            distance_m: summary.distance_m,
-            duration_s: summary.duration_s,
-            elevation_m: summary.elevation_m ?? 0,
-            avg_speed_ms: summary.avg_speed_ms ?? null,
-            has_gps: summary.has_gps,
-            has_streams: summary.has_streams,
-            polyline: raw.map?.summary_polyline ?? null,
-            streams: undefined
-          })
+      const summary = mapStravaToSummary(raw, userId)
 
-          if (suspectRes.isSuspicious) {
-            potentialSuspects.push({ raw, summary, reasons: suspectRes.suspicionReasons })
-            continue // skip automatic insert
-          }
-        } catch (e) {
-          console.warn("suspicion check failed for imported activity", e)
-          // fallthrough -> try insert
+      // Vérifier suspicion avant insertion
+      try {
+        const suspectRes = analyzeActivitySuspicion({
+          sport: summary.sport,
+          distance_m: summary.distance_m,
+          duration_s: summary.duration_s,
+          elevation_m: summary.elevation_m ?? 0,
+          avg_speed_ms: summary.avg_speed_ms ?? null,
+          has_gps: summary.has_gps,
+          has_streams: summary.has_streams,
+          polyline: raw.map?.summary_polyline ?? null,
+          streams: undefined
+        })
+
+        console.log("[import] suspicion check", { externalId: summary.externalId, suspectRes })
+
+        if (suspectRes.isSuspicious) {
+          potentialSuspects.push({ raw, summary, reasons: suspectRes.suspicionReasons })
+          console.log("[import] marking as suspect (skipped insert)", { externalId: summary.externalId, reasons: suspectRes.suspicionReasons })
+          continue // skip automatic insert
         }
+      } catch (e) {
+        console.warn("suspicion check failed for imported activity", e)
+        // fallthrough -> try insert
+      }
 
-        // 1) recherche de doublons potentiels multi-niveaux
-        const candidates = await findSimilarActivities(userId, summary)
-        const top = candidates[0]
-        const THRESHOLD = 0.7
-        if (top && top.score >= THRESHOLD) {
-          potentialDuplicates.push({
-            imported: { raw, summary },
-            candidates: candidates.slice(0, 5).map(c => ({ id: c.id, score: c.score }))
-          })
-          continue
-        }
+      // 1) recherche de doublons potentiels multi-niveaux
+      const candidates = await findSimilarActivities(userId, summary)
+      const top = candidates[0]
+      const THRESHOLD = 0.7
+      console.log("[import] duplicate candidates", { externalId: summary.externalId, topScore: top?.score ?? null, candidates: candidates.slice(0, 5).map(c => ({ id: c.id, score: c.score })) })
 
+      if (top && top.score >= THRESHOLD) {
+        potentialDuplicates.push({
+          imported: { raw, summary },
+          candidates: candidates.slice(0, 5).map(c => ({ id: c.id, score: c.score }))
+        })
+        console.log("[import] marking as potential duplicate (skipped insert)", { externalId: summary.externalId, topScore: top.score, topId: top.id })
+        continue
+      }
+
+      try {
         const activityId = await upsertActivitySummary(summary)
+        console.log("[import] inserted activity", { externalId: summary.externalId, activityId })
 
         const details = mapStravaToDetails(raw, userId, activityId)
         await upsertActivityDetails(details)
+        console.log("[import] upserted details", { activityId })
+      } catch (e) {
+        console.error("[import] failed to upsert activity/details", { externalId: summary.externalId, err: e })
       }
+    }
 
       // Exposer suspects au frontend pour confirmation/suppression manuelle
       if (potentialSuspects.length > 0) {
