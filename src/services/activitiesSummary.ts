@@ -58,8 +58,6 @@ export async function upsertActivitySummary(
       has_streams: activity.has_streams,
       has_power: activity.has_power,
 
-      load: activity.load ?? null,
-
       createdAt,
       updatedAt: Timestamp.fromDate(new Date())
     },
@@ -112,7 +110,6 @@ export async function findSimilarActivities(
       has_gps: data.has_gps,
       has_streams: data.has_streams,
       has_power: data.has_power,
-      load: data.load ?? undefined,
       createdAt: data.createdAt.toDate()
     }
 
@@ -176,7 +173,6 @@ export async function getUserActivitySummaries(
       has_streams: data.has_streams,
       has_power: data.has_power,
 
-      load: data.load ?? undefined,
       createdAt: data.createdAt.toDate()
     }
   })

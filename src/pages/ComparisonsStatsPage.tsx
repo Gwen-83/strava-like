@@ -42,7 +42,7 @@ function fmtRangeLabel(start?: Date, end?: Date) {
 }
 
 export default function ComparisonsStatsPage({ activities }: { activities: ActivitySummary[] }) {
-  const [sportFilter, setSportFilter] = useState<"All" | "Ride" | "Run" | "Walk">("All")
+  const [sportFilter, setSportFilter] = useState<"All" | "Cyclisme" | "Course" | "Marche" | "Randonnée">("All")
   const [periodType, setPeriodType] = useState<"week" | "month" | "year">("week")
   const todayIso = new Date().toISOString().slice(0, 10)
   const [baseDate, setBaseDate] = useState<string>(todayIso)
@@ -97,9 +97,10 @@ export default function ComparisonsStatsPage({ activities }: { activities: Activ
                   aria-label="Filtrer par sport"
                 >
                   <option value="All">Tous</option>
-                  <option value="Ride">Ride</option>
-                  <option value="Run">Run</option>
-                  <option value="Walk">Walk</option>
+                  <option value="Cyclisme">Ride</option>
+                  <option value="Course">Run</option>
+                  <option value="Marche">Walk</option>
+                  <option value="Randonnée">Hike</option>
                 </select>
               </div>
 

@@ -15,28 +15,6 @@ function ActivityPage() {
   const [endCity, setEndCity] = useState<string | null>(null)
   const [loadMethod, setLoadMethod] = useState<string | null>(null) // 'hr' | 'speed' | 'none'
 
-  // Détermine la méthode de calcul de la charge pour une activité donnée
-  const determineLoadMethod = (act: any) => {
-    const REST_HR = 48
-    const REF_SPEEDS_KMH: Record<string, number> = { Walk: 5, Ride: 25, Run: 10 }
-
-    const avgH = Number.isFinite(act.avg_hrt) ? act.avg_hrt : NaN
-    const maxH = Number.isFinite(act.max_hrt) ? act.max_hrt : NaN
-    if (Number.isFinite(avgH) && Number.isFinite(maxH) && (maxH - REST_HR) !== 0) {
-      return "hr"
-    }
-
-    const durS = Number.isFinite(act.duration_s) ? act.duration_s : NaN
-    const distM = Number.isFinite(act.distance_m) ? act.distance_m : NaN
-    const speedKmh = Number.isFinite(distM) && Number.isFinite(durS) && durS > 0 ? (distM / durS) * 3.6 : NaN
-    const ref = act.sport && REF_SPEEDS_KMH[act.sport] ? REF_SPEEDS_KMH[act.sport] : NaN
-    if (Number.isFinite(speedKmh) && Number.isFinite(ref) && ref > 0) {
-      return "speed"
-    }
-
-    return "none"
-  }
-
   useEffect(() => {
     if (!id) return
 
@@ -94,7 +72,6 @@ function ActivityPage() {
       }
 
       setActivity(actObj)
-      setLoadMethod(determineLoadMethod(actObj))
       setLoading(false)
     }
 
@@ -253,12 +230,6 @@ function ActivityPage() {
           {activity.energy_kj != null && <p><strong>Énergie :</strong> {activity.energy_kj} kJ</p>}
           {activity.avg_hrt != null && <p><strong>FC moyenne :</strong> {activity.avg_hrt} bpm</p>}
           {activity.max_hrt != null && <p><strong>FC maximale :</strong> {activity.max_hrt} bpm</p>}
-          {loadMethod != null && (
-            <p>
-              <strong>Méthode de calcul (charge) :</strong>{" "}
-              {loadMethod === "hr" ? "FC (K)" : loadMethod === "speed" ? "Vitesse (fallback)" : "Indisponible"}
-            </p>
-          )}
 
           {/* Localisation : n'afficher la section que si au moins une ville existe */}
           {(startCity || endCity) && (

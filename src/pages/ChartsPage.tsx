@@ -6,6 +6,7 @@ import "../styles/charts.css";
 export default function ChartsPage({ activities }: { activities: ActivitySummary[] }) {
   const [period, setPeriod] = useState<"week" | "month" | "year">("week");
   const [rangeFilter, setRangeFilter] = useState<"all" | "last7" | "last31" | "last12months">("all");
+  const [openHelpFor, setOpenHelpFor] = useState<string | null>(null);
   
   // helper: UTC-normalized ISO yyyy-mm-dd for a Date at midnight UTC
   const isoDateUTC = (d: Date) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())).toISOString().slice(0,10);
@@ -69,12 +70,6 @@ export default function ChartsPage({ activities }: { activities: ActivitySummary
     const utc = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
     utc.setUTCHours(0,0,0,0);
     return utc.toISOString().slice(0,10);
-  }
-
-  const keyFnForPeriod = (d: Date) => {
-    if (period === "week") return startOfWeekISO(d);
-    if (period === "month") return startOfMonthISO(d);
-    return startOfYearISO(d);
   }
 
   // helpers to step periods (ISO yyyy-mm-dd) — works in UTC. now supports 'day'
@@ -160,12 +155,76 @@ export default function ChartsPage({ activities }: { activities: ActivitySummary
   // value functions
   const kmFn = (a: ActivitySummary) => (a.distance_m || 0) / 1000;
   const elevationFn = (a: ActivitySummary) => a.elevation_m || 0;
-  const trainingLoadFn = (a: ActivitySummary) => {
-    const km = (a.distance_m || 0) / 1000;
-    const hours = (a.duration_s || 0) / 3600;
-    return km * hours;
-  };
 
+  // helper median
+  function median(values: number[]) {
+    if (!values.length) return NaN;
+    const s = values.slice().sort((a,b) => a - b);
+    const mid = Math.floor(s.length / 2);
+    return s.length % 2 === 1 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+  }
+
+  // compute reference speeds (km/h) per sport from activities (use durations > 5400s)
+  const DEFAULT_REF_SPEEDS: Record<string, number> = { Marche: 5, Cyclisme: 25, Course: 10, Randonnée: 4 };
+  const SPORTS = Object.keys(DEFAULT_REF_SPEEDS);
+  const REF_SPEEDS_KMH: Record<string, number> = SPORTS.reduce((acc, sp) => {
+    const speeds = activities
+      .filter(a => a.sport === sp && Number(a.duration_s) > 1800 && Number(a.distance_m) > 0)
+      .map(a => (Number(a.distance_m) / Number(a.duration_s)) * 3.6);
+    const m = median(speeds);
+    acc[sp] = Number.isFinite(m) ? m : DEFAULT_REF_SPEEDS[sp];
+    return acc;
+  }, {} as Record<string, number>);
+
+  const K_GRADE = 0.005; // k for grade factor
+  const N_EXP_BY_SPORT: Record<string, number> = {
+    Marche: 1.8,
+    Course: 2.6,
+    Cyclisme: 2.4,
+    Randonnée: 2.2,
+  };
+  const DEFAULT_N_EXP = 2.5;
+  const VAR_ALPHA = 0.5; // variability weighting
+
+  // remplacé : fonction qui calcule la charge pour une activité (avec ajustement pour le dénivelé et exposants par sport)
+  const trainingLoadFn = (a: ActivitySummary) => {
+    const durS = Number(a.duration_s);
+    if (!Number.isFinite(durS) || durS <= 0) return 0;
+    const durationHours = durS / 3600;
+
+    const distM = Number(a.distance_m);
+    const speedKmh = Number.isFinite(distM) && durS > 0 ? (distM / durS) * 3.6 : NaN;
+
+    // gradeFactor using elevation (guard distance)
+    const elev = Number(a.elevation_m) || 0;
+    const distKm = distM > 0 ? distM / 1000 : NaN;
+    // rawGrade in m/km, cap at 150
+    const rawGrade = Number.isFinite(distKm) && distKm > 0 ? elev / distKm : NaN;
+    const gradeFactor = Number.isFinite(rawGrade) ? 1 + K_GRADE * Math.min(rawGrade, 150) : 1;
+    const adjSpeed = Number.isFinite(speedKmh) ? speedKmh * gradeFactor : NaN;
+
+    const sport = a.sport || "Autre";
+    const ref = sport in REF_SPEEDS_KMH ? REF_SPEEDS_KMH[sport] : NaN;
+
+    let actLoad = 0;
+    if (Number.isFinite(adjSpeed) && Number.isFinite(ref) && ref > 0) {
+      const ratio = adjSpeed / ref;
+      const nExp = sport in N_EXP_BY_SPORT ? N_EXP_BY_SPORT[sport] : DEFAULT_N_EXP;
+      actLoad = 100 * durationHours * Math.pow(ratio, nExp);
+    } else {
+      actLoad = 0;
+    }
+
+    // variability factor based on reported max speed (fallback 1)
+    const variability = Number.isFinite(Number(a.max_speed_ms)*3.6) && Number.isFinite(speedKmh) && speedKmh > 0
+      ? Number(a.max_speed_ms)*3.6 / speedKmh
+      : 1;
+    const variabilityFactor = 1 + VAR_ALPHA * Math.max(0, variability - 1);
+    actLoad *= variabilityFactor;
+
+    return Number.isFinite(actLoad) ? actLoad : 0;
+  };
+  
   // keyFn/day helper for daily buckets
   const keyFnDay = (d: Date) => d.toISOString().slice(0,10);
   
@@ -230,7 +289,20 @@ export default function ChartsPage({ activities }: { activities: ActivitySummary
           </select>
         </div>
 
-        <div className="chart-card">
+        <div className="chart-card" style={{ position: "relative" }}>
+          <button className="chart-help-button" onClick={() => setOpenHelpFor("distance")} aria-label="Aide distance">?</button>
+          {openHelpFor === "distance" && (
+            <div className="chart-help-overlay" role="dialog" aria-modal="true">
+              <div className="chart-help-content">
+                <button className="chart-help-close" onClick={() => setOpenHelpFor(null)} aria-label="Fermer">×</button>
+                <div style={{ paddingTop: 6 }}>
+                  {/* Placeholder: contenu d'aide pour Distance — remplacer plus tard */}
+                  <strong>Distance — Aide</strong>
+                  <p style={{ marginTop: 8 }}>Ici vous pouvez ajouter des informations sur le graphique de distance.</p>
+                </div>
+              </div>
+            </div>
+          )}
           <h3>Distance par période (km) — empilé par sport</h3>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={distanceStacked.data} barCategoryGap="20%">
@@ -246,7 +318,20 @@ export default function ChartsPage({ activities }: { activities: ActivitySummary
           </ResponsiveContainer>
         </div>
 
-        <div className="chart-card">
+        <div className="chart-card" style={{ position: "relative" }}>
+          <button className="chart-help-button" onClick={() => setOpenHelpFor("elevation")} aria-label="Aide dénivelé">?</button>
+          {openHelpFor === "elevation" && (
+            <div className="chart-help-overlay" role="dialog" aria-modal="true">
+              <div className="chart-help-content">
+                <button className="chart-help-close" onClick={() => setOpenHelpFor(null)} aria-label="Fermer">×</button>
+                <div style={{ paddingTop: 6 }}>
+                  {/* Placeholder: contenu d'aide pour Dénivelé */}
+                  <strong>Dénivelé — Aide</strong>
+                  <p style={{ marginTop: 8 }}>Ici vous pouvez ajouter des informations sur le graphique de dénivelé.</p>
+                </div>
+              </div>
+            </div>
+          )}
           <h3>Dénivelé par période (m) — empilé par sport</h3>
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={elevationStacked.data} barCategoryGap="20%">
@@ -262,7 +347,65 @@ export default function ChartsPage({ activities }: { activities: ActivitySummary
           </ResponsiveContainer>
         </div>
 
-        <div className="chart-card">
+        <div className="chart-card" style={{ position: "relative" }}>
+          <button className="chart-help-button" onClick={() => setOpenHelpFor("training")} aria-label="Aide charge d'entraînement">?</button>
+          {openHelpFor === "training" && (
+            <div className="chart-help-overlay" role="dialog" aria-modal="true">
+              <div className="chart-help-content">
+                <button className="chart-help-close" onClick={() => setOpenHelpFor(null)} aria-label="Fermer">×</button>
+                <div style={{ paddingTop: 6 }}>
+                  <strong>Charge d’entraînement</strong>
+
+                  <h4 style={{ marginTop: 12 }}>À quoi sert ce graphique ?</h4>
+                  <p>
+                    Ce graphique montre la charge globale de vos entraînements dans le temps.
+                    Il permet de visualiser l’intensité et le volume cumulés, afin d’identifier
+                    les périodes de fatigue, de surcharge ou de récupération.
+                  </p>
+
+                  <h4>Comment est-elle calculée ?</h4>
+                  <p>
+                    La charge combine trois éléments :
+                  </p>
+                  <ul>
+                    <li>la durée de l’activité</li>
+                    <li>l’intensité estimée à partir de la vitesse</li>
+                    <li>le dénivelé positif</li>
+                  </ul>
+                  <p>
+                    L’intensité augmente de façon non linéaire : une séance rapide compte
+                    proportionnellement plus qu’une séance facile.
+                  </p>
+
+                  <h4>Personnalisation</h4>
+                  <p>
+                    La vitesse de référence est calculée automatiquement à partir de vos sorties
+                    passées pour chaque sport. La charge est donc adaptée à votre niveau et
+                    évolue avec votre forme.
+                  </p>
+
+                  <h4>Comment interpréter les valeurs ?</h4>
+                  <p>
+                    La charge est une valeur relative (sans unité). En ordre de grandeur :
+                  </p>
+                  <ul>
+                    <li>≈ 100 : ~1 h d’endurance</li>
+                    <li>200–300 : séance soutenue</li>
+                    <li>350+ : charge élevée</li>
+                  </ul>
+                  <p>
+                    L’important est la comparaison dans le temps, pas la valeur absolue.
+                  </p>
+
+                  <h4>Limites</h4>
+                  <p>
+                    Cette estimation ne remplace pas des mesures physiologiques (fréquence
+                    cardiaque, puissance) et ne détecte pas finement les intervalles.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
           <h3>Charge d'entraînement</h3>
           <ResponsiveContainer width="100%" height={220}>
             <AreaChart data={trainingLoadData}>

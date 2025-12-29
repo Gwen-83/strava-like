@@ -3,6 +3,7 @@
   padding: 18px;
   color: var(--text-color, #fff);
   font-family: inherit;
+  grid-column: 1 / -1;
 }
 
 /* Controls */

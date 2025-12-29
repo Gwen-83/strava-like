@@ -37,7 +37,6 @@ export async function upsertActivityDetails(
       energy_kj: details.energy_kj ?? null,
       avg_hrt: details.avg_hrt ?? null,
       max_hrt: details.max_hrt ?? null,
-      load: details.load ?? null,
 
       has_gps: details.has_gps,
       has_streams: details.has_streams,

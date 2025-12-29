@@ -49,6 +49,18 @@
   grid-template-columns: repeat(2, 1fr);
   gap:12px;
 }
+
+.section-activities {
+  grid-column: 1 / -1;
+}
+
+/* ensure charts area can span full dashboard width when used inside the dashboard layout */
+.dashboard .charts-grid {
+  grid-column: 1 / -1;
+  max-width: none;
+  margin: 0; /* allow it to use parent's padding/space */
+}
+
 @media (max-width:900px){
   .dashboard-grid{ grid-template-columns: 1fr; }
   .charts-grid{ grid-template-columns: 1fr; }
@@ -188,4 +200,88 @@
 .sort option {
   color: #111;
   background: rgba(96,165,250,0.12);
+}
+
+/* Dropdown tabs */
+.tab-dropdown { font-family: inherit; }
+.tab-dropdown-toggle {
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--text);
+}
+.tab-dropdown-toggle:hover,
+.tab-dropdown-toggle:focus {
+  background: rgba(255,255,255,0.02);
+  border-color: rgba(255,255,255,0.04);
+  outline: none;
+}
+
+.tab-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 160px;
+  background: var(--panel-background, #0b1220);
+  border: 1px solid rgba(255,255,255,0.04);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(2,6,23,0.45);
+  z-index: 60;
+  padding: 6px;
+}
+
+.tab-dropdown-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.tab-dropdown-menu button:hover,
+.tab-dropdown-menu button:focus {
+  background: linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.03));
+  outline: none;
+}
+
+/* ensure dropdowns don't overflow on small screens */
+@media (max-width: 640px) {
+  .tab-dropdown-menu { min-width: 140px; left: auto; right: 0; }
+}
+
+.tab-dropdown-toggle,
+.tab-button {
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  color: inherit;
+  transition: background-color 120ms, border-color 120ms;
+  margin-right: 12px; /* remplace les styles inline */
+}
+
+.tab-dropdown-toggle:hover,
+.tab-button:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.tab-dropdown-toggle:focus,
+.tab-button:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(100, 150, 255, 0.15);
+}
+
+.tab-button[aria-selected="true"],
+.tab-dropdown-toggle[aria-selected="true"] {
+  background: rgba(0, 120, 212, 0.08);
+  border-color: rgba(0, 120, 212, 0.18);
 }

@@ -17,8 +17,6 @@ function computeMetrics(activities: ActivitySummary[]) {
       return s + (Number.isFinite(a.elevation_m as any) ? (a.elevation_m as number) : 0);
     }, 0);
 
-    const l=0.92;
-    const REST_HR = 48;
     const REF_SPEEDS_KMH: Record<string, number> = {
       Walk: 5,
       Ride: 25,
@@ -27,35 +25,20 @@ function computeMetrics(activities: ActivitySummary[]) {
     const N_EXP = 2.5;
 
     const load = activities.reduce((s, a) => {
-      // duration in hours
-      const durS = Number.isFinite(a.duration_s) ? a.duration_s : NaN;
+      const durS = Number(a.duration_s);
       if (!Number.isFinite(durS) || durS <= 0) return s;
       const durationHours = durS / 3600;
 
-      // attempt K-based computation
-      const avgH = Number.isFinite((a as any).avg_hrt) ? (a as any).avg_hrt : NaN;
-      const maxH = Number.isFinite((a as any).max_hrt) ? (a as any).max_hrt : NaN;
-      const denom = Number.isFinite(maxH) ? (maxH - REST_HR) : NaN;
-      let actLoad: number | null = null;
+      const distM = Number(a.distance_m);
+      const speedKmh = Number.isFinite(distM) && durS > 0 ? (distM / durS) * 3.6 : NaN;
+      const ref = a.sport && REF_SPEEDS_KMH[a.sport] ? REF_SPEEDS_KMH[a.sport] : NaN;
 
-      if (Number.isFinite(avgH) && Number.isFinite(denom) && denom !== 0) {
-        const K = (avgH - REST_HR) / denom;
-        if (Number.isFinite(K)) {
-          actLoad = durationHours * (K * Math.exp(l * K));
-        }
-      }
-
-      // fallback: duration * (speed / ref_speed)^N_EXP
-      if (actLoad === null) {
-        const distM = Number.isFinite(a.distance_m) ? a.distance_m : NaN;
-        const speedKmh = Number.isFinite(distM) && durS > 0 ? (distM / durS) * 3.6 : NaN;
-        const ref = a.sport && REF_SPEEDS_KMH[a.sport] ? REF_SPEEDS_KMH[a.sport] : NaN;
-        if (Number.isFinite(speedKmh) && Number.isFinite(ref) && ref > 0) {
-          const ratio = speedKmh / ref;
-          actLoad = durationHours * Math.pow(ratio, N_EXP);
-        } else {
-          actLoad = 0;
-        }
+      let actLoad = 0;
+      if (Number.isFinite(speedKmh) && Number.isFinite(ref) && ref > 0) {
+        const ratio = speedKmh / ref;
+        actLoad = durationHours * Math.pow(ratio, N_EXP);
+      } else {
+        actLoad = 0;
       }
 
       return s + (Number.isFinite(actLoad) ? actLoad : 0);

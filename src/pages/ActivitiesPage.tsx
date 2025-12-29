@@ -5,7 +5,7 @@ export default function ActivitiesPage({ activities, onSelect }: { activities: A
   const [sportFilter, setSportFilter] = useState<"All" | "Ride" | "Run" | "Walk">("All")
   const filteredActivities = activities.filter(a =>sportFilter === "All" || a.sport === sportFilter)
   return (
-    <section title={`Activités (${activities.length})`}>
+    <section className="section-activities" title={`Activités (${activities.length})`}>
       <div className="dashboard-actions" role="group" aria-label="Filtres">
         <label style={{display:"none"}} htmlFor="sport-filter">Filtrer sport</label>
         <select

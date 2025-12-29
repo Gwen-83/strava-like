@@ -16,6 +16,7 @@
   padding: 16px;
   box-shadow: 0 8px 22px rgba(2,6,23,0.5);
   border: 1px solid rgba(255,255,255,0.03);
+  position: relative; /* Added position relative for absolute positioning of help button */
 }
 
 /* Headings inside cards */
@@ -93,4 +94,64 @@
 .charts-grid select option {
   color: var(--text);
   background: rgba(0,0,0,0.95);
+}
+
+/* Help button style */
+.chart-help-button {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.03);
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(2,6,23,0.4);
+  transition: transform .12s ease;
+}
+.chart-help-button:hover { transform: scale(1.05); }
+
+/* Help overlay style */
+.chart-help-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, rgba(2,6,23,0.9), rgba(2,6,23,0.95));
+  z-index: 40;
+  padding: 18px;
+  border-radius: 12px;
+}
+
+.chart-help-content {
+  width: min(680px, 92%);
+  max-height: 80%;
+  overflow: auto;
+  background: rgba(6,8,20,0.98);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 10px;
+  padding: 14px 16px;
+  box-shadow: 0 10px 30px rgba(2,6,23,0.6);
+  color: var(--text);
+}
+
+.chart-help-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  border: none;
+  background: rgba(255,255,255,0.03);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 18px;
 }

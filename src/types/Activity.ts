@@ -1,4 +1,4 @@
-export type SportType = "Ride" | "Run" | "Walk" |"Other"
+export type SportType = "Cyclisme" | "Course" | "Marche" | "Randonnée" | "Autre"
 export type ActivitySource = "strava" | "garmin" | "gpx" | "fit" | "manual"
 
 export type ActivitySummary = {

@@ -9,11 +9,17 @@ import MainPage from "./MainPage";
 import ChartsPage from "./ChartsPage";
 import ComparisonsStatsPage from "./ComparisonsStatsPage";
 import ActivitiesPage from "./ActivitiesPage";
+import ProfilePage from "./ProfilePage";
+import { useUser } from "../contexts/UserContext";
 
 function Dashboard() {
+  const { username } = useUser();
   const [activities, setActivities] = useState<ActivitySummary[]>([])
   const [selected, setSelected] = useState<ActivitySummary | null>(null)
-  const [activeTab, setActiveTab] = useState<"Accueil" | "Graphiques" | "Stats" | "Activités">("Accueil")
+  const [activeTab, setActiveTab] = useState<"Accueil" | "Analyse" | "Entrainement" | "Profil">("Accueil")
+  const [analysisSubTab, setAnalysisSubTab] = useState<"Graphiques" | "Stats">("Graphiques")
+  const [showAnalyseMenu, setShowAnalyseMenu] = useState(false)
+  const [showEntrainementMenu, setShowEntrainementMenu] = useState(false)
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -79,12 +85,69 @@ function Dashboard() {
     <div className="dashboard">
       <div className="dashboard-inner">
         <header className="dashboard-header" style={{display: "flex", alignItems: "center", gap: 12}}>
-          <h2 className="header-title">Dashboard</h2>
+          <h2 className="header-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span>Dashboard</span>
+            {username ? <span style={{ color: "#666", fontSize: 14 }}>({username})</span> : null}
+          </h2>
           <nav className="tabs" role="tablist" aria-label="Navigation principale" style={{marginLeft: 12}}>
-            <button role="tab" aria-selected={activeTab === "Accueil"} onClick={() => setActiveTab("Accueil")} style={{marginRight: 12}}>Accueil</button>
-            <button role="tab" aria-selected={activeTab === "Graphiques"} onClick={() => setActiveTab("Graphiques")} style={{marginRight: 12}}>Graphiques</button>
-            <button role="tab" aria-selected={activeTab === "Stats"} onClick={() => setActiveTab("Stats")} style={{marginRight: 12}}>Comparaisons & Stats</button>
-            <button role="tab" aria-selected={activeTab === "Activités"} onClick={() => setActiveTab("Activités")} style={{marginRight: 12}}>Activités</button>
+            <button 
+              className="tab-dropdown-toggle tab-button" 
+              role="tab" 
+              aria-selected={activeTab === "Accueil"} 
+              onClick={() => { setActiveTab("Accueil"); setShowAnalyseMenu(false); setShowEntrainementMenu(false); }}
+            >
+              Accueil
+            </button>
+
+            {/* Analyse dropdown (open on hover; click on items changes content) */}
+            <div
+              className="tab-dropdown"
+              onMouseEnter={() => setShowAnalyseMenu(true)}
+              onMouseLeave={() => setShowAnalyseMenu(false)}
+              style={{ display: "inline-block", position: "relative", marginRight: 12 }}
+            >
+              <button
+                className="tab-dropdown-toggle"
+                role="button"
+                aria-haspopup="menu"
+                aria-expanded={showAnalyseMenu}
+                aria-selected={activeTab === "Analyse"}
+              >
+                Analyse ▾
+              </button>
+              {showAnalyseMenu && (
+                <div className="tab-dropdown-menu" role="menu">
+                  <button role="menuitem" onClick={() => { setAnalysisSubTab("Graphiques"); setActiveTab("Analyse"); setShowAnalyseMenu(false); }}>Graphiques</button>
+                  <button role="menuitem" onClick={() => { setAnalysisSubTab("Stats"); setActiveTab("Analyse"); setShowAnalyseMenu(false); }}>Comparaisons & Stats</button>
+                </div>
+              )}
+            </div>
+
+            {/* Entrainement dropdown (pour l'instant un seul item) */}
+            <div
+              className="tab-dropdown"
+              onMouseEnter={() => setShowEntrainementMenu(true)}
+              onMouseLeave={() => setShowEntrainementMenu(false)}
+              style={{ display: "inline-block", position: "relative", marginRight: 12 }}
+            >
+              <button className="tab-dropdown-toggle" role="button" aria-haspopup="menu" aria-expanded={showEntrainementMenu} aria-selected={activeTab === "Entrainement"}>
+                Entrainement ▾
+              </button>
+              {showEntrainementMenu && (
+                <div className="tab-dropdown-menu" role="menu">
+                  <button role="menuitem" onClick={() => { setActiveTab("Entrainement"); setShowEntrainementMenu(false); }}>Activités</button>
+                </div>
+              )}
+            </div>
+
+            <button 
+              className="tab-dropdown-toggle tab-button" 
+              role="tab" 
+              aria-selected={activeTab === "Profil"} 
+              onClick={() => { setActiveTab("Profil"); setShowAnalyseMenu(false); setShowEntrainementMenu(false); }}
+            >
+              Profil
+            </button>
           </nav>
         </header>
 
@@ -92,14 +155,17 @@ function Dashboard() {
           {activeTab === "Accueil" && (
             <MainPage activities={activities} onImport={handleStravaImport} />
           )}
-          {activeTab === "Graphiques" && (
+          {activeTab === "Analyse" && analysisSubTab === "Graphiques" && (
             <ChartsPage activities={activities} />
           )}
-          {activeTab === "Stats" && (
+          {activeTab === "Analyse" && analysisSubTab === "Stats" && (
             <ComparisonsStatsPage activities={activities} />
           )}
-          {activeTab === "Activités" && (
+          {activeTab === "Entrainement" && (
             <ActivitiesPage activities={activities} onSelect={setSelected} />
+          )}
+          {activeTab === "Profil" && (
+            <ProfilePage />
           )}
         </main>
 

@@ -138,3 +138,20 @@ h2{ font-size:20px; letter-spacing: -0.02em; }
   /* ensure cards inside sidebar stretch full width */
   .sidebar .card { width:100% }
 }
+
+.section-mainPage {
+  grid-column: 1 / -1; /* span the full grid (like Comparisons) */
+  width: 100%;
+  max-width: none; /* remove any max-width constraint */
+  margin: 0; 
+  padding-left: 12px;
+  padding-right: 12px;
+  box-sizing: border-box;
+}
+
+/* Optionnel : si le parent .dashboard-inner limite la largeur, forcer l'enfant à s'étendre */
+.dashboard-inner > .section-mainPage,
+.dashboard-grid > .section-mainPage {
+  width: 100%;
+  max-width: none;
+}
