@@ -5,6 +5,50 @@ import "../styles/charts.css";
 
 export default function ChartsPage({ activities }: { activities: ActivitySummary[] }) {
   const [period, setPeriod] = useState<"week" | "month" | "year">("week");
+  const [rangeFilter, setRangeFilter] = useState<"all" | "last7" | "last31" | "last12months">("all");
+  
+  // helper: UTC-normalized ISO yyyy-mm-dd for a Date at midnight UTC
+  const isoDateUTC = (d: Date) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())).toISOString().slice(0,10);
+  
+  // compute forced range (startIso,endIso) and displayPeriod when rangeFilter != 'all'
+  const forcedRange = (() => {
+    if (rangeFilter === "all") return null;
+    const now = new Date();
+    const todayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    if (rangeFilter === "last7") {
+      const start = new Date(todayUtc.getTime() - (7 - 1) * 24 * 3600 * 1000); // last 7 days inclusive
+      return { startIso: isoDateUTC(start), endIso: isoDateUTC(todayUtc), displayPeriod: "day" as const };
+    }
+    if (rangeFilter === "last31") {
+      const start = new Date(todayUtc.getTime() - (31 - 1) * 24 * 3600 * 1000);
+      return { startIso: isoDateUTC(start), endIso: isoDateUTC(todayUtc), displayPeriod: "day" as const };
+    }
+    // last12months: 12 monthly buckets (including current month)
+    const startMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 11, 1));
+    const endMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    return { startIso: isoDateUTC(startMonth), endIso: isoDateUTC(endMonth), displayPeriod: "month" as const };
+  })();
+
+  // activities filtered by time cutoff (used for data shown). When forcedRange present we still filter to that window.
+  const filteredByRange = (() => {
+    if (!forcedRange) return activities;
+    const start = new Date(forcedRange.startIso + "T00:00:00Z");
+    const end = new Date(forcedRange.endIso + "T00:00:00Z");
+    // for month range endIso currently is first-of-month; include that month -> advance end to next bucket
+    let endInclusive = new Date(end);
+    if (forcedRange.displayPeriod === "month") {
+      endInclusive = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() + 1, 1));
+      endInclusive.setUTCDate(endInclusive.getUTCDate() - 1); // include the month
+    } else {
+      endInclusive = new Date(end.getTime()); // it's already that day's 00:00
+    }
+    // include entire end day: set to next day 00:00 for comparison consistent with existing code (start <= date < nextDay)
+    const endExclusive = new Date(Date.UTC(endInclusive.getUTCFullYear(), endInclusive.getUTCMonth(), endInclusive.getUTCDate() + 1));
+    return activities.filter(a => {
+      const d = new Date(a.startDate);
+      return d >= start && d < endExclusive;
+    });
+  })();
 
   // period start helpers (return ISO yyyy-mm-dd) — UTC-safe
   function startOfWeekISO(d: Date) {
@@ -33,15 +77,16 @@ export default function ChartsPage({ activities }: { activities: ActivitySummary
     return startOfYearISO(d);
   }
 
-  // helpers to step periods (ISO yyyy-mm-dd) — works in UTC
-  function addPeriodISO(iso: string, p: "week" | "month" | "year") {
+  // helpers to step periods (ISO yyyy-mm-dd) — works in UTC. now supports 'day'
+  function addPeriodISO(iso: string, p: "day" | "week" | "month" | "year") {
     const d = new Date(iso + "T00:00:00Z");
-    if (p === "week") d.setUTCDate(d.getUTCDate() + 7);
+    if (p === "day") d.setUTCDate(d.getUTCDate() + 1);
+    else if (p === "week") d.setUTCDate(d.getUTCDate() + 7);
     else if (p === "month") d.setUTCMonth(d.getUTCMonth() + 1);
     else d.setUTCFullYear(d.getUTCFullYear() + 1);
     return d.toISOString().slice(0,10);
   }
-  function generatePeriodRange(startIso: string, endIso: string, p: "week" | "month" | "year") {
+  function generatePeriodRange(startIso: string, endIso: string, p: "day" | "week" | "month" | "year") {
     const keys: string[] = [];
     let cur = startIso;
     while (cur <= endIso) {
@@ -52,7 +97,7 @@ export default function ChartsPage({ activities }: { activities: ActivitySummary
   }
 
   // Build stacked series for a given key function and value extractor
-  function buildStacked(acts: ActivitySummary[], keyFn: (d: Date) => string, valueFn: (a: ActivitySummary) => number) {
+  function buildStacked(acts: ActivitySummary[], keyFn: (d: Date) => string, valueFn: (a: ActivitySummary) => number, p: "day" | "week" | "month" | "year" = period, forceRange?: { startIso: string; endIso: string }) {
     const map = new Map<string, Record<string, any>>();
     const sports = new Set<string>();
     for (const a of acts) {
@@ -65,14 +110,17 @@ export default function ChartsPage({ activities }: { activities: ActivitySummary
     }
 
     // ensure we include empty periods between first and last
-    if (map.size > 0) {
-      const keysSorted = Array.from(map.keys()).sort();
-      const startIso = keysSorted[0];
-      const endIso = keysSorted[keysSorted.length - 1];
-      const fullKeys = generatePeriodRange(startIso, endIso, period);
-      for (const fk of fullKeys) {
-        if (!map.has(fk)) map.set(fk, { key: fk, __date: new Date(fk + "T00:00:00Z") });
+    const fullKeys = (() => {
+      if (forceRange) return generatePeriodRange(forceRange.startIso, forceRange.endIso, p);
+      if (map.size > 0) {
+        const keysSorted = Array.from(map.keys()).sort();
+        return generatePeriodRange(keysSorted[0], keysSorted[keysSorted.length - 1], p);
       }
+      return [];
+    })();
+
+    for (const fk of fullKeys) {
+      if (!map.has(fk)) map.set(fk, { key: fk, __date: new Date(fk + "T00:00:00Z") });
     }
 
     // ensure every sport property exists (0 when absent)
@@ -88,7 +136,7 @@ export default function ChartsPage({ activities }: { activities: ActivitySummary
   }
 
   // Build simple aggregate (not stacked) for a period, filling missing periods with value 0
-  function buildAggregate(acts: ActivitySummary[], keyFn: (d: Date) => string, valueFn: (a: ActivitySummary) => number) {
+  function buildAggregate(acts: ActivitySummary[], keyFn: (d: Date) => string, valueFn: (a: ActivitySummary) => number, p: "day" | "week" | "month" | "year" = period, forceRange?: { startIso: string; endIso: string }) {
     const map = new Map<string, { key: string; __date: Date; value: number }>();
     for (const a of acts) {
       const k = keyFn(new Date(a.startDate));
@@ -98,10 +146,9 @@ export default function ChartsPage({ activities }: { activities: ActivitySummary
     }
 
     if (map.size > 0) {
-      const keysSorted = Array.from(map.keys()).sort();
-      const startIso = keysSorted[0];
-      const endIso = keysSorted[keysSorted.length - 1];
-      const fullKeys = generatePeriodRange(startIso, endIso, period);
+      const fullKeys = forceRange
+        ? generatePeriodRange(forceRange.startIso, forceRange.endIso, p)
+        : generatePeriodRange(Array.from(map.keys()).sort()[0], Array.from(map.keys()).sort()[Array.from(map.keys()).length - 1], p);
       for (const fk of fullKeys) {
         if (!map.has(fk)) map.set(fk, { key: fk, __date: new Date(fk + "T00:00:00Z"), value: 0 });
       }
@@ -119,28 +166,45 @@ export default function ChartsPage({ activities }: { activities: ActivitySummary
     return km * hours;
   };
 
-  const distanceStacked = buildStacked(activities, keyFnForPeriod, kmFn);
-  const elevationStacked = buildStacked(activities, keyFnForPeriod, elevationFn);
-  const trainingLoadData = buildAggregate(activities, keyFnForPeriod, trainingLoadFn);
+  // keyFn/day helper for daily buckets
+  const keyFnDay = (d: Date) => d.toISOString().slice(0,10);
+  
+  // determine displayPeriod/keyFn and forceRange for bucket generation
+  const displayPeriod: "day" | "week" | "month" | "year" = forcedRange ? forcedRange.displayPeriod : period;
+  // Use explicit period-start functions (don't rely on keyFnForPeriod which reads `period` state)
+  const effectiveKeyFn = (d: Date) => {
+    if (displayPeriod === "day") return keyFnDay(d);
+    if (displayPeriod === "week") return startOfWeekISO(d);
+    if (displayPeriod === "month") return startOfMonthISO(d);
+    return startOfYearISO(d);
+  };
+  const forceRangeParam = forcedRange ? { startIso: forcedRange.startIso, endIso: forcedRange.endIso } : undefined;
+ 
+  const distanceStacked = buildStacked(filteredByRange, effectiveKeyFn, kmFn, displayPeriod as any, forceRangeParam);
+  const elevationStacked = buildStacked(filteredByRange, effectiveKeyFn, elevationFn, displayPeriod as any, forceRangeParam);
+  const trainingLoadData = buildAggregate(filteredByRange, effectiveKeyFn, trainingLoadFn, displayPeriod as any, forceRangeParam);
+ 
+  // tick/tooltip formatters based on period (UTC-safe)
+  const intlMonthYear = new Intl.DateTimeFormat(undefined, { month: "short", year: "numeric", timeZone: "UTC" });
+  const intlMonthLongYear = new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric", timeZone: "UTC" });
+  const intlDateUTC = new Intl.DateTimeFormat(undefined, { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" });
 
-  // tick/tooltip formatters based on period
   const tickFormatter = (k: string) => {
     try {
       const d = new Date(k + "T00:00:00Z");
-      if (period === "week") {
-        // n'affiche le label que pour la première semaine du mois
-        return d.getUTCDate() <= 7 ? d.toLocaleDateString(undefined, { month: "short", year: "numeric" }) : "";
-      }
-      if (period === "month") return d.toLocaleDateString(undefined, { month: "short", year: "numeric" });
-      return String(d.getFullYear());
+      if (displayPeriod === "day") return d.toLocaleDateString(undefined, { day: "2-digit", month: "short", timeZone: "UTC" });
+      if (displayPeriod === "week") return d.getUTCDate() <= 7 ? intlMonthYear.format(d) : "";
+      if (displayPeriod === "month") return intlMonthYear.format(d);
+      return String(d.getUTCFullYear());
     } catch { return k; }
   };
+
   const tooltipLabel = (v: any) => {
     try {
       const d = new Date(String(v) + "T00:00:00Z");
-      if (period === "week") return d.toLocaleDateString();
-      if (period === "month") return d.toLocaleDateString(undefined, { month: "long", year: "numeric" });
-      return String(d.getFullYear());
+      if (displayPeriod === "day" || displayPeriod === "week") return intlDateUTC.format(d);
+      if (displayPeriod === "month") return intlMonthLongYear.format(d);
+      return String(d.getUTCFullYear());
     } catch {
       return String(v);
     }
@@ -156,14 +220,22 @@ export default function ChartsPage({ activities }: { activities: ActivitySummary
           <button onClick={() => setPeriod("week")} aria-pressed={period==="week"}>Semaine</button>
           <button onClick={() => setPeriod("month")} aria-pressed={period==="month"}>Mois</button>
           <button onClick={() => setPeriod("year")} aria-pressed={period==="year"}>Année</button>
+          <div style={{ width: 12 }} />
+          <label style={{ marginRight: 6 }}>Plage :</label>
+          <select value={rangeFilter} onChange={e => setRangeFilter(e.target.value as any)} aria-label="Filtrer la plage de dates">
+            <option value="all">Tous</option>
+            <option value="last7">Derniers 7 jours</option>
+            <option value="last31">Derniers 31 jours</option>
+            <option value="last12months">Derniers 12 mois (par mois)</option>
+          </select>
         </div>
 
         <div className="chart-card">
           <h3>Distance par période (km) — empilé par sport</h3>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={distanceStacked.data} barCategoryGap="20%">
-              <CartesianGrid strokeDasharray="3 3" vertical={period !== "week"} />
-              <XAxis dataKey="key" tick={(props) => {const { x, y, payload } = props; return ( <text x={x} y={y} textAnchor="end" transform={`rotate(-45, ${x}, ${y})`} fontSize={12}>{tickFormatter(payload.value)}</text>);}}height={60}interval={0}/>
+              <CartesianGrid strokeDasharray="3 3" vertical={displayPeriod !== "week"} />
+              <XAxis dataKey="key" tick={(props) => {const { x, y, payload } = props; return ( <text x={x} y={y} textAnchor="end" transform={`rotate(-45, ${x}, ${y})`} fontSize={12} fill="var(--text)">{tickFormatter(payload.value)}</text>);}}height={60}interval={0}/>
               <YAxis />
               <Tooltip labelFormatter={tooltipLabel} />
               <Legend verticalAlign="top" height={28} />
@@ -178,8 +250,8 @@ export default function ChartsPage({ activities }: { activities: ActivitySummary
           <h3>Dénivelé par période (m) — empilé par sport</h3>
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={elevationStacked.data} barCategoryGap="20%">
-              <CartesianGrid strokeDasharray="3 3" vertical={period !== "week"} />
-              <XAxis dataKey="key" tick={(props) => {const { x, y, payload } = props; return ( <text x={x} y={y} textAnchor="end" transform={`rotate(-45, ${x}, ${y})`} fontSize={12}>{tickFormatter(payload.value)}</text>);}}height={60}interval={0}/>
+              <CartesianGrid strokeDasharray="3 3" vertical={displayPeriod !== "week"} />
+              <XAxis dataKey="key" tick={(props) => {const { x, y, payload } = props; return ( <text x={x} y={y} textAnchor="end" transform={`rotate(-45, ${x}, ${y})`} fontSize={12} fill="var(--text)">{tickFormatter(payload.value)}</text>);}}height={60}interval={0}/>
               <YAxis />
               <Tooltip labelFormatter={tooltipLabel} />
               <Legend verticalAlign="top" height={28} />
@@ -194,8 +266,8 @@ export default function ChartsPage({ activities }: { activities: ActivitySummary
           <h3>Charge d'entraînement</h3>
           <ResponsiveContainer width="100%" height={220}>
             <AreaChart data={trainingLoadData}>
-              <CartesianGrid strokeDasharray="3 3" vertical={period !== "week"} />
-              <XAxis dataKey="key" tick={(props) => {const { x, y, payload } = props; return ( <text x={x} y={y} textAnchor="end" transform={`rotate(-45, ${x}, ${y})`} fontSize={12}>{tickFormatter(payload.value)}</text>);}}height={60}interval={0}/>
+              <CartesianGrid strokeDasharray="3 3" vertical={displayPeriod !== "week"} />
+              <XAxis dataKey="key" tick={(props) => {const { x, y, payload } = props; return ( <text x={x} y={y} textAnchor="end" transform={`rotate(-45, ${x}, ${y})`} fontSize={12} fill="var(--text)">{tickFormatter(payload.value)}</text>);}}height={60}interval={0}/>
               <YAxis />
               <Tooltip labelFormatter={tooltipLabel} />
               <Area type="monotone" dataKey="value" stroke="#ffc658" fill="#fff1cc" strokeWidth={2} dot={false} />

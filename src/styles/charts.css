@@ -27,7 +27,7 @@
 
 /* Recharts text styling for better contrast */
 .recharts-cartesian-axis-tick text {
-  fill: var(--muted);
+  fill: var(--text);
   font-size: 12px;
 }
 .recharts-legend-item text {
@@ -79,4 +79,18 @@
 .recharts-tooltip-wrapper .recharts-tooltip-item-value {
   color: var(--muted) !important;
   font-weight: 700;
+}
+
+/* Select (dark) for charts controls */
+.charts-grid select {
+  color: var(--text);
+  background: rgba(0,0,0,0.85);
+  border: 1px solid rgba(255,255,255,0.06);
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+.charts-grid select option {
+  color: var(--text);
+  background: rgba(0,0,0,0.95);
 }
