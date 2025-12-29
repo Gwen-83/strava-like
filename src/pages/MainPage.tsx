@@ -243,9 +243,9 @@ export default function MainPage({
       if (o.unit === "mi") return (meters / 1000) * 0.621371
       return meters / 1000
     }
-    // new: handle elevation objectives (sum elevation_m, convert to ft if needed)
+
     if (o.kind === "elevation") {
-      const meters = filtered.reduce((s, a) => s + (Number(a.elevation_m) || 0), 0)
+      const meters = filtered.reduce((s, a) => s + ( Number(a.elevation_m) || 0), 0)
       if (o.unit === "ft") return meters * 3.28084
       return meters
     }

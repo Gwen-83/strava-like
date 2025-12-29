@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
 import type { SportType } from "../types/Activity";
 
@@ -66,21 +66,71 @@ export const UserProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
 		} catch {}
 	}, [email, username, sport, objectives, activities]);
 
-	// Try to read Firebase auth email if firebase is present (dynamic import so it fails gracefully)
+	// Try to read Firebase auth/email and optionally Firestore user doc (dynamic import so it fails gracefully).
+	// If a Firebase user is present we will load remote data (and later persist changes back).
+	const firebaseCtx = useRef<any>(null);
+
 	useEffect(() => {
 		(async () => {
-			// Try modular API (firebase v9+)
+			// Helper to try modular API first (v9+)
 			try {
-				const mod = await import("firebase/auth");
-				const { getAuth, onAuthStateChanged } = mod as any;
+				const authMod = await import("firebase/auth");
+				const firestoreMod = await import("firebase/firestore");
+				const { getAuth, onAuthStateChanged } = authMod as any;
+				const { getFirestore, doc, getDoc, setDoc } = firestoreMod as any;
+
 				if (typeof getAuth === "function") {
 					const auth = getAuth();
-					// current user if available
-					const user = (auth && auth.currentUser) || null;
-					if (user && user.email) setEmailState(user.email);
+					const dbGetter = getFirestore;
+					firebaseCtx.current = { auth, dbGetter, doc, getDoc, setDoc };
+
+					// load current user doc if available
+					const maybeUser = (auth && auth.currentUser) || null;
+					if (maybeUser) {
+						const uid = maybeUser.uid || maybeUser.email || null;
+						if (maybeUser.email) setEmailState(maybeUser.email);
+						// attempt to load Firestore doc
+						try {
+							const db = dbGetter();
+							const docRef = doc(db, "users", uid);
+							const snap = await getDoc(docRef);
+							if (snap && snap.exists && snap.exists()) {
+								const data = snap.data() || {};
+								if (data.email) setEmailState(data.email);
+								if (data.username) setUsernameState(data.username);
+								if (data.sport) setSportState(data.sport);
+								if (Array.isArray(data.objectives)) setObjectives(data.objectives);
+								if (Array.isArray(data.activities)) setActivities(data.activities);
+							}
+						} catch {
+							// ignore firestore read error
+						}
+					}
+
+					// subscribe to auth state changes to fetch remote profile when user signs in
 					if (typeof onAuthStateChanged === "function") {
-						onAuthStateChanged(auth, (u: any) => {
-							if (u && u.email) setEmailState(u.email);
+						onAuthStateChanged(auth, async (u: any) => {
+							if (u) {
+								if (u.email) setEmailState(u.email);
+								const uid = u.uid || u.email || null;
+								if (uid && firebaseCtx.current && firebaseCtx.current.dbGetter) {
+									try {
+										const db = firebaseCtx.current.dbGetter();
+										const docRef = firebaseCtx.current.doc(db, "users", uid);
+										const snap = await firebaseCtx.current.getDoc(docRef);
+										if (snap && snap.exists && snap.exists()) {
+											const data = snap.data() || {};
+											if (data.email) setEmailState(data.email);
+											if (data.username) setUsernameState(data.username);
+											if (data.sport) setSportState(data.sport);
+											if (Array.isArray(data.objectives)) setObjectives(data.objectives);
+											if (Array.isArray(data.activities)) setActivities(data.activities);
+										}
+									} catch {
+										// ignore
+									}
+								}
+							}
 						});
 					}
 					return;
@@ -92,13 +142,49 @@ export const UserProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
 			// Fallback: check window.firebase (namespaced, v8)
 			try {
 				const fb = (window as any).firebase;
-				if (fb && typeof fb.auth === "function") {
+				if (fb && typeof fb.auth === "function" && typeof fb.firestore === "function") {
 					const auth = fb.auth();
+					const db = fb.firestore();
+					firebaseCtx.current = { auth, db };
+
 					const user = auth.currentUser || null;
 					if (user && user.email) setEmailState(user.email);
+					if (user) {
+						// try to read user doc (/users/{uid_or_email}) if available
+						try {
+							const uid = user.uid || user.email;
+							const docRef = db.collection("users").doc(uid);
+							const snap = await docRef.get();
+							if (snap && snap.exists) {
+								const data = snap.data() || {};
+								if (data.email) setEmailState(data.email);
+								if (data.username) setUsernameState(data.username);
+								if (data.sport) setSportState(data.sport);
+								if (Array.isArray(data.objectives)) setObjectives(data.objectives);
+								if (Array.isArray(data.activities)) setActivities(data.activities);
+							}
+						} catch {
+							// ignore
+						}
+					}
 					if (typeof auth.onAuthStateChanged === "function") {
-						auth.onAuthStateChanged((u: any) => {
+						auth.onAuthStateChanged(async (u: any) => {
 							if (u && u.email) setEmailState(u.email);
+							if (u && firebaseCtx.current && firebaseCtx.current.db) {
+								try {
+									const uid = u.uid || u.email;
+									const docRef = firebaseCtx.current.db.collection("users").doc(uid);
+									const snap = await docRef.get();
+									if (snap && snap.exists) {
+										const data = snap.data() || {};
+										if (data.email) setEmailState(data.email);
+										if (data.username) setUsernameState(data.username);
+										if (data.sport) setSportState(data.sport);
+										if (Array.isArray(data.objectives)) setObjectives(data.objectives);
+										if (Array.isArray(data.activities)) setActivities(data.activities);
+									}
+								} catch {}
+							}
 						});
 					}
 				}
@@ -107,6 +193,45 @@ export const UserProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
 			}
 		})();
 	}, []);
+
+	// persist on change (localStorage + optional firestore if user connected)
+	useEffect(() => {
+		const toSave = { email, username, sport, objectives, activities };
+		try {
+			localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+		} catch {}
+
+		// try to save to Firestore if available and user is authenticated
+		(async () => {
+			try {
+				if (firebaseCtx.current) {
+					// modular API
+					if (firebaseCtx.current.dbGetter) {
+						const db = firebaseCtx.current.dbGetter();
+						// try to get uid/email for doc id
+						const auth = firebaseCtx.current.auth;
+						const user = auth && auth.currentUser;
+						const uid = (user && (user.uid || user.email)) || null;
+						if (uid) {
+							const docRef = firebaseCtx.current.doc(db, "users", uid);
+							await firebaseCtx.current.setDoc(docRef, toSave, { merge: true });
+						}
+					} else if (firebaseCtx.current.db && firebaseCtx.current.auth) {
+						// namespaced v8
+						const db = firebaseCtx.current.db;
+						const auth = firebaseCtx.current.auth;
+						const user = auth.currentUser;
+						const uid = (user && (user.uid || user.email)) || null;
+						if (uid) {
+							await db.collection("users").doc(uid).set(toSave, { merge: true });
+						}
+					}
+				}
+			} catch {
+				// ignore firestore write error
+			}
+		})();
+	}, [email, username, sport, objectives, activities]);
 
 	const setEmail = (e: string) => setEmailState(e);
 	const setUsername = (u: string) => setUsernameState(u);
@@ -122,7 +247,39 @@ export const UserProvider: React.FC<React.PropsWithChildren<{}>> = ({ children }
 	}, []);
 
 	const removeObjective = useCallback((id: string) => {
-		setObjectives((prev) => prev.filter((o) => o.id !== id));
+		setObjectives((prev) => {
+			const next = prev.filter((o) => o.id !== id);
+
+			// attempt immediate remote update (async, fire-and-forget)
+			(async () => {
+				try {
+					if (firebaseCtx.current) {
+						if (firebaseCtx.current.dbGetter) {
+							const db = firebaseCtx.current.dbGetter();
+							const auth = firebaseCtx.current.auth;
+							const user = auth && auth.currentUser;
+							const uid = (user && (user.uid || user.email)) || null;
+							if (uid) {
+								const docRef = firebaseCtx.current.doc(db, "users", uid);
+								await firebaseCtx.current.setDoc(docRef, { objectives: next }, { merge: true });
+							}
+						} else if (firebaseCtx.current.db && firebaseCtx.current.auth) {
+							const db = firebaseCtx.current.db;
+							const auth = firebaseCtx.current.auth;
+							const user = auth.currentUser;
+							const uid = (user && (user.uid || user.email)) || null;
+							if (uid) {
+								await db.collection("users").doc(uid).set({ objectives: next }, { merge: true });
+							}
+						}
+					}
+				} catch {
+					// ignore firestore write errors (existing behavior)
+				}
+			})();
+
+			return next;
+		});
 	}, []);
 
 	const clearActivities = () => {
