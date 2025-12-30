@@ -26,10 +26,11 @@ export interface SuspicionResult {
 }
 
 const MAX_REALISTIC_SPEED_KMH: Record<SportType, number> = {
-  Run: 25,
-  Ride: 90,
-  Walk: 10,
-  Other: 50,
+  Course: 25,
+  Cyclisme: 90,
+  Marche: 10,
+  Randonnée: 8,
+  Autre: 50,
 }
 
 function addScore(

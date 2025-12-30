@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 import { useUser } from "../contexts/UserContext"
 import type { Objective } from "../contexts/UserContext"
 import type { SportType } from "../types/Activity"
@@ -41,7 +41,6 @@ export default function ProfilePage() {
 		addObjective,
 		updateObjective,
 		removeObjective,
-		clearActivities,
 		logout,
 	} = useUser()
 

@@ -2,7 +2,7 @@ import type { ActivitySummary } from "../types/Activity"
 import { useState } from "react"
 
 export default function ActivitiesPage({ activities, onSelect }: { activities: ActivitySummary[], onSelect: (a: ActivitySummary) => void }) {
-  const [sportFilter, setSportFilter] = useState<"All" | "Ride" | "Run" | "Walk">("All")
+  const [sportFilter, setSportFilter] = useState<"All" | "Cyclisme" | "Course" | "Marche" | "Randonnée">("All")
   const filteredActivities = activities.filter(a =>sportFilter === "All" || a.sport === sportFilter)
   return (
     <section className="section-activities" title={`Activités (${activities.length})`}>
@@ -16,9 +16,10 @@ export default function ActivitiesPage({ activities, onSelect }: { activities: A
           aria-label="Filtrer par sport"
         >
           <option value="All">Tous</option>
-          <option value="Ride">Ride</option>
-          <option value="Run">Run</option>
-          <option value="Walk">Walk</option>
+          <option value="Cyclisme">Cyclisme</option>
+          <option value="Course">Course</option>
+          <option value="Marche">Marche</option>
+          <option value="Randonnée">Randonnée</option>
         </select>
       </div>
       <ul className="activities-list">

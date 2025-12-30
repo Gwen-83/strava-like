@@ -1,0 +1,166 @@
+/* Encadré conseil — tons bleu cohérents avec la palette du site */
+.training-advice {
+  position: relative;
+  margin-top: 12px;
+  padding: 14px;
+  border-radius: 10px;
+  color: #0b2a44;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+  background: #f7fbff;
+  border: 1px solid #e6f0ff;
+}
+
+/* Variantes selon le type (classes ajoutées dynamiquement via kind) */
+.training-advice.risk_overload {
+  background: #e6f4ff;
+  border: solid 5px rgb(255, 0, 0);
+}
+.training-advice.rapid_increase {
+  background: #f0f8ff;
+  border: solid 5px rgb(255, 255, 0);
+}
+.training-advice.healthy {
+  background: #e8fbf1;
+  border: solid 5px rgb(0, 255, 0);
+}
+
+/* Bouton aide sur l'encadré */
+.help-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  border-radius: 16px;
+  border: none;
+  background: #1976d2;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Overlay backdrop */
+.overlay-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 20px;
+}
+
+/* Dialog */
+.advice-dialog {
+  max-width: 800px;
+  max-height: 90vh;
+  overflow: auto;
+  background: #fff;
+  color: #111;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+}
+
+/* Close button inside dialog */
+.dialog-close {
+  margin-left: 12px;
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: #333;
+}
+
+@media (max-width: 768px) {
+  /* Stack main columns vertically */
+  .section-mainPage {
+    flex-direction: column;
+    gap: 14px;
+    padding: 10px;
+  }
+
+  /* Left column (was inline width:260) -> full width on mobile */
+  .section-mainPage > div:first-child {
+    width: 100% !important;
+  }
+
+  /* Middle container (holds calendar + aside) -> stack its children */
+  .section-mainPage > div:nth-child(2) {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+    width: 100% !important;
+  }
+  .section-mainPage > div:nth-child(2) > div,
+  .section-mainPage > div:nth-child(2) > aside {
+    width: 100% !important;
+  }
+
+  /* Reduce calendar day cell height (overrides inline minHeight) */
+  div[style*="min-height"] {
+    min-height: 44px !important;
+  }
+
+  /* Make calendar labels and items more compact */
+  .section-mainPage div > h3,
+  .section-mainPage h4 {
+    font-size: 1rem;
+  }
+  .section-mainPage div[style*="display: grid"] div {
+    font-size: 12px;
+  }
+
+  /* Compact last activities list */
+  ul {
+    padding-left: 12px;
+  }
+  ul li div {
+    font-size: 13px;
+  }
+
+  /* Objectives panel: reduce paddings and font sizes */
+  aside {
+    padding: 8px !important;
+  }
+  aside h3 {
+    font-size: 1rem;
+  }
+  aside .small-muted {
+    font-size: 13px;
+  }
+
+  /* Training advice box: adapt spacing and help button */
+  .training-advice {
+    padding: 12px;
+    border-radius: 8px;
+  }
+  .training-advice .help-btn {
+    top: 8px;
+    right: 8px;
+    width: 26px;
+    height: 26px;
+    font-size: 13px;
+    border-radius: 13px;
+  }
+
+  /* Dialog / overlay full width friendly */
+  .advice-dialog {
+    max-width: 95%;
+    padding: 14px;
+    border-radius: 8px;
+    max-height: 88vh;
+  }
+  .overlay-backdrop {
+    padding: 8px;
+  }
+
+  /* Make buttons/tap targets a bit larger where needed */
+  button {
+    min-height: 36px;
+  }
+}

@@ -13,7 +13,6 @@ function ActivityPage() {
   const [loading, setLoading] = useState(true)
   const [startCity, setStartCity] = useState<string | null>(null)
   const [endCity, setEndCity] = useState<string | null>(null)
-  const [loadMethod, setLoadMethod] = useState<string | null>(null) // 'hr' | 'speed' | 'none'
 
   useEffect(() => {
     if (!id) return
