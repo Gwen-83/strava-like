@@ -1,5 +1,5 @@
 import type { ActivitySummary } from "../types/Activity"
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, ResponsiveContainer, AreaChart, Area, Legend } from "recharts";
 import "../styles/charts.css";
 
@@ -12,7 +12,7 @@ export default function ChartsPage({ activities }: { activities: ActivitySummary
   const isoDateUTC = (d: Date) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())).toISOString().slice(0,10);
   
   // compute forced range (startIso,endIso) and displayPeriod when rangeFilter != 'all'
-  const forcedRange = (() => {
+  const baseForcedRange = (() => {
     if (rangeFilter === "all") return null;
     const now = new Date();
     const todayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
@@ -29,6 +29,35 @@ export default function ChartsPage({ activities }: { activities: ActivitySummary
     const endMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
     return { startIso: isoDateUTC(startMonth), endIso: isoDateUTC(endMonth), displayPeriod: "month" as const };
   })();
+
+  // detect mobile (<=900px) to alter only mobile UI/behaviour
+  const [isMobile, setIsMobile] = useState<boolean>(() => typeof window !== "undefined" ? window.matchMedia("(max-width:900px)").matches : false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width:900px)");
+    const handler = (ev: MediaQueryListEvent) => setIsMobile(ev.matches);
+    // modern browsers support addEventListener on MediaQueryList, fallback to addListener
+    if (typeof mq.addEventListener === "function") mq.addEventListener("change", handler);
+    else mq.addListener(handler);
+    setIsMobile(mq.matches);
+    return () => {
+      if (typeof mq.removeEventListener === "function") mq.removeEventListener("change", handler);
+      else mq.removeListener(handler);
+    };
+  }, []);
+
+  // mobile forced range: last 6 weeks (6 weekly buckets, including current week)
+  const mobileForcedRange = (() => {
+    const now = new Date();
+    const todayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const curWeekStartIso = startOfWeekISO(todayUtc);
+    const startDate = new Date(curWeekStartIso + "T00:00:00Z");
+    // go back 5 additional weeks to have 6 total (current + previous 5)
+    startDate.setUTCDate(startDate.getUTCDate() - (6 - 1) * 7);
+    return { startIso: isoDateUTC(startDate), endIso: curWeekStartIso, displayPeriod: "week" as const };
+  })();
+
+  const forcedRange = isMobile ? mobileForcedRange : baseForcedRange;
 
   // activities filtered by time cutoff (used for data shown). When forcedRange present we still filter to that window.
   const filteredByRange = (() => {
@@ -227,7 +256,16 @@ export default function ChartsPage({ activities }: { activities: ActivitySummary
   
   // keyFn/day helper for daily buckets
   const keyFnDay = (d: Date) => d.toISOString().slice(0,10);
-  
+  // tick renderer adapts to mobile (no rotation, smaller font)
+  const tickRenderer = (props: any) => {
+    const { x, y, payload } = props;
+    const label = tickFormatter(payload.value);
+    if (isMobile) {
+      return <text x={x} y={y} textAnchor="middle" fontSize={11} fill="var(--text)">{label}</text>;
+    }
+    return (<text x={x} y={y} textAnchor="end" transform={`rotate(-45, ${x}, ${y})`} fontSize={12} fill="var(--text)">{label}</text>);
+  };
+
   // determine displayPeriod/keyFn and forceRange for bucket generation
   const displayPeriod: "day" | "week" | "month" | "year" = forcedRange ? forcedRange.displayPeriod : period;
   // Use explicit period-start functions (don't rely on keyFnForPeriod which reads `period` state)
@@ -273,150 +311,158 @@ export default function ChartsPage({ activities }: { activities: ActivitySummary
   const colors = ["#60a5fa", "#f59e0b", "#34d399", "#fb7185", "#a78bfa", "#f97316"];
 
   return (
-      <section className="charts-grid">
-        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
-          <strong style={{ marginRight: 8 }}>Période :</strong>
-          <button onClick={() => setPeriod("week")} aria-pressed={period==="week"}>Semaine</button>
-          <button onClick={() => setPeriod("month")} aria-pressed={period==="month"}>Mois</button>
-          <button onClick={() => setPeriod("year")} aria-pressed={period==="year"}>Année</button>
-          <div style={{ width: 12 }} />
-          <label style={{ marginRight: 6 }}>Plage :</label>
-          <select value={rangeFilter} onChange={e => setRangeFilter(e.target.value as any)} aria-label="Filtrer la plage de dates">
-            <option value="all">Tous</option>
-            <option value="last7">Derniers 7 jours</option>
-            <option value="last31">Derniers 31 jours</option>
-            <option value="last12months">Derniers 12 mois (par mois)</option>
-          </select>
-        </div>
-
-        <div className="chart-card" style={{ position: "relative" }}>
-          <button className="chart-help-button" onClick={() => setOpenHelpFor("distance")} aria-label="Aide distance">?</button>
-          {openHelpFor === "distance" && (
-            <div className="chart-help-overlay" role="dialog" aria-modal="true">
-              <div className="chart-help-content">
-                <button className="chart-help-close" onClick={() => setOpenHelpFor(null)} aria-label="Fermer">×</button>
-                <div style={{ paddingTop: 6 }}>
-                  {/* Placeholder: contenu d'aide pour Distance — remplacer plus tard */}
-                  <strong>Distance — Aide</strong>
-                  <p style={{ marginTop: 8 }}>Ici vous pouvez ajouter des informations sur le graphique de distance.</p>
-                </div>
-              </div>
-            </div>
-          )}
-          <h3>Distance par période (km) — empilé par sport</h3>
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={distanceStacked.data} barCategoryGap="20%">
-              <CartesianGrid strokeDasharray="3 3" vertical={displayPeriod !== "week"} />
-              <XAxis dataKey="key" tick={(props) => {const { x, y, payload } = props; return ( <text x={x} y={y} textAnchor="end" transform={`rotate(-45, ${x}, ${y})`} fontSize={12} fill="var(--text)">{tickFormatter(payload.value)}</text>);}}height={60}interval={0}/>
-              <YAxis />
-              <Tooltip labelFormatter={tooltipLabel} />
-              <Legend verticalAlign="top" height={28} />
-              {distanceStacked.sports.map((s, i) => (
-                <Bar key={s} dataKey={s} stackId="a" fill={colors[i % colors.length]}/>
-              ))}
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div className="chart-card" style={{ position: "relative" }}>
-          <button className="chart-help-button" onClick={() => setOpenHelpFor("elevation")} aria-label="Aide dénivelé">?</button>
-          {openHelpFor === "elevation" && (
-            <div className="chart-help-overlay" role="dialog" aria-modal="true">
-              <div className="chart-help-content">
-                <button className="chart-help-close" onClick={() => setOpenHelpFor(null)} aria-label="Fermer">×</button>
-                <div style={{ paddingTop: 6 }}>
-                  {/* Placeholder: contenu d'aide pour Dénivelé */}
-                  <strong>Dénivelé — Aide</strong>
-                  <p style={{ marginTop: 8 }}>Ici vous pouvez ajouter des informations sur le graphique de dénivelé.</p>
-                </div>
-              </div>
-            </div>
-          )}
-          <h3>Dénivelé par période (m) — empilé par sport</h3>
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={elevationStacked.data} barCategoryGap="20%">
-              <CartesianGrid strokeDasharray="3 3" vertical={displayPeriod !== "week"} />
-              <XAxis dataKey="key" tick={(props) => {const { x, y, payload } = props; return ( <text x={x} y={y} textAnchor="end" transform={`rotate(-45, ${x}, ${y})`} fontSize={12} fill="var(--text)">{tickFormatter(payload.value)}</text>);}}height={60}interval={0}/>
-              <YAxis />
-              <Tooltip labelFormatter={tooltipLabel} />
-              <Legend verticalAlign="top" height={28} />
-              {elevationStacked.sports.map((s, i) => (
-                <Bar key={s} dataKey={s} stackId="a" fill={colors[i % colors.length]}/>
-              ))}
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div className="chart-card" style={{ position: "relative" }}>
-          <button className="chart-help-button" onClick={() => setOpenHelpFor("training")} aria-label="Aide charge d'entraînement">?</button>
-          {openHelpFor === "training" && (
-            <div className="chart-help-overlay" role="dialog" aria-modal="true">
-              <div className="chart-help-content">
-                <button className="chart-help-close" onClick={() => setOpenHelpFor(null)} aria-label="Fermer">×</button>
-                <div style={{ paddingTop: 6 }}>
-                  <strong>Charge d’entraînement</strong>
-
-                  <h4 style={{ marginTop: 12 }}>À quoi sert ce graphique ?</h4>
-                  <p>
-                    Ce graphique montre la charge globale de vos entraînements dans le temps.
-                    Il permet de visualiser l’intensité et le volume cumulés, afin d’identifier
-                    les périodes de fatigue, de surcharge ou de récupération.
-                  </p>
-
-                  <h4>Comment est-elle calculée ?</h4>
-                  <p>
-                    La charge combine trois éléments :
-                  </p>
-                  <ul>
-                    <li>la durée de l’activité</li>
-                    <li>l’intensité estimée à partir de la vitesse</li>
-                    <li>le dénivelé positif</li>
-                  </ul>
-                  <p>
-                    L’intensité augmente de façon non linéaire : une séance rapide compte
-                    proportionnellement plus qu’une séance facile.
-                  </p>
-
-                  <h4>Personnalisation</h4>
-                  <p>
-                    La vitesse de référence est calculée automatiquement à partir de vos sorties
-                    passées pour chaque sport. La charge est donc adaptée à votre niveau et
-                    évolue avec votre forme.
-                  </p>
-
-                  <h4>Comment interpréter les valeurs ?</h4>
-                  <p>
-                    La charge est une valeur relative (sans unité). En ordre de grandeur :
-                  </p>
-                  <ul>
-                    <li>≈ 100 : ~1 h d’endurance</li>
-                    <li>200–300 : séance soutenue</li>
-                    <li>350+ : charge élevée</li>
-                  </ul>
-                  <p>
-                    L’important est la comparaison dans le temps, pas la valeur absolue.
-                  </p>
-
-                  <h4>Limites</h4>
-                  <p>
-                    Cette estimation ne remplace pas des mesures physiologiques (fréquence
-                    cardiaque, puissance) et ne détecte pas finement les intervalles.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-          <h3>Charge d'entraînement</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={trainingLoadData}>
-              <CartesianGrid strokeDasharray="3 3" vertical={displayPeriod !== "week"} />
-              <XAxis dataKey="key" tick={(props) => {const { x, y, payload } = props; return ( <text x={x} y={y} textAnchor="end" transform={`rotate(-45, ${x}, ${y})`} fontSize={12} fill="var(--text)">{tickFormatter(payload.value)}</text>);}}height={60}interval={0}/>
-              <YAxis />
-              <Tooltip labelFormatter={tooltipLabel} />
-              <Area type="monotone" dataKey="value" stroke="#ffc658" fill="#fff1cc" strokeWidth={2} dot={false} />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      </section>
-  )
-}
+       <section className="charts-grid">
+        {!isMobile && (
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
+           <strong style={{ marginRight: 8 }}>Période :</strong>
+           <button onClick={() => setPeriod("week")} aria-pressed={period==="week"}>Semaine</button>
+           <button onClick={() => setPeriod("month")} aria-pressed={period==="month"}>Mois</button>
+           <button onClick={() => setPeriod("year")} aria-pressed={period==="year"}>Année</button>
+           <div style={{ width: 12 }} />
+           <label style={{ marginRight: 6 }}>Plage :</label>
+           <select value={rangeFilter} onChange={e => setRangeFilter(e.target.value as any)} aria-label="Filtrer la plage de dates">
+             <option value="all">Tous</option>
+             <option value="last7">Derniers 7 jours</option>
+             <option value="last31">Derniers 31 jours</option>
+             <option value="last12months">Derniers 12 mois (par mois)</option>
+           </select>
+          </div>
+        )}
+ 
+        {isMobile && (
+          <div style={{ marginBottom: 8, color: "var(--muted)", fontSize: 13 }}>
+            Affichage mobile — dernières 6 semaines - Plus de détails sur ordinateur
+          </div>
+        )}
+ 
+         <div className="chart-card" style={{ position: "relative" }}>
+           <button className="chart-help-button" onClick={() => setOpenHelpFor("distance")} aria-label="Aide distance">?</button>
+           {openHelpFor === "distance" && (
+             <div className="chart-help-overlay" role="dialog" aria-modal="true">
+               <div className="chart-help-content">
+                 <button className="chart-help-close" onClick={() => setOpenHelpFor(null)} aria-label="Fermer">×</button>
+                 <div style={{ paddingTop: 6 }}>
+                   {/* Placeholder: contenu d'aide pour Distance — remplacer plus tard */}
+                   <strong>Distance — Aide</strong>
+                   <p style={{ marginTop: 8 }}>Ici vous pouvez ajouter des informations sur le graphique de distance.</p>
+                 </div>
+               </div>
+             </div>
+           )}
+           <h3>Distance par période (km)</h3>
+           <ResponsiveContainer width="100%" height={220}>
+             <BarChart data={distanceStacked.data} barCategoryGap="10%">
+               <CartesianGrid strokeDasharray="3 3" vertical={displayPeriod !== "week"} />
+               <XAxis dataKey="key" tick={tickRenderer} height={isMobile ? 40 : 60} interval={0} />
+               <YAxis />
+               <Tooltip labelFormatter={tooltipLabel} />
+               <Legend verticalAlign="top" height={28} />
+               {distanceStacked.sports.map((s, i) => (
+                 <Bar key={s} dataKey={s} stackId="a" fill={colors[i % colors.length]} isAnimationActive={false} />
+               ))}
+             </BarChart>
+           </ResponsiveContainer>
+         </div>
+ 
+         <div className="chart-card" style={{ position: "relative" }}>
+           <button className="chart-help-button" onClick={() => setOpenHelpFor("elevation")} aria-label="Aide dénivelé">?</button>
+           {openHelpFor === "elevation" && (
+             <div className="chart-help-overlay" role="dialog" aria-modal="true">
+               <div className="chart-help-content">
+                 <button className="chart-help-close" onClick={() => setOpenHelpFor(null)} aria-label="Fermer">×</button>
+                 <div style={{ paddingTop: 6 }}>
+                   {/* Placeholder: contenu d'aide pour Dénivelé */}
+                   <strong>Dénivelé — Aide</strong>
+                   <p style={{ marginTop: 8 }}>Ici vous pouvez ajouter des informations sur le graphique de dénivelé.</p>
+                 </div>
+               </div>
+             </div>
+           )}
+           <h3>Dénivelé par période (m)</h3>
+           <ResponsiveContainer width="100%" height={180}>
+             <BarChart data={elevationStacked.data} barCategoryGap="10%">
+               <CartesianGrid strokeDasharray="3 3" vertical={displayPeriod !== "week"} />
+               <XAxis dataKey="key" tick={tickRenderer} height={isMobile ? 40 : 60} interval={0} />
+               <YAxis />
+               <Tooltip labelFormatter={tooltipLabel} />
+               <Legend verticalAlign="top" height={28} />
+               {elevationStacked.sports.map((s, i) => (
+                 <Bar key={s} dataKey={s} stackId="a" fill={colors[i % colors.length]} isAnimationActive={false} />
+               ))}
+             </BarChart>
+           </ResponsiveContainer>
+         </div>
+ 
+         <div className="chart-card" style={{ position: "relative" }}>
+           <button className="chart-help-button" onClick={() => setOpenHelpFor("training")} aria-label="Aide charge d'entraînement">?</button>
+           {openHelpFor === "training" && (
+             <div className="chart-help-overlay" role="dialog" aria-modal="true">
+               <div className="chart-help-content">
+                 <button className="chart-help-close" onClick={() => setOpenHelpFor(null)} aria-label="Fermer">×</button>
+                 <div style={{ paddingTop: 6 }}>
+                   <strong>Charge d’entraînement</strong>
+ 
+                   <h4 style={{ marginTop: 12 }}>À quoi sert ce graphique ?</h4>
+                   <p>
+                     Ce graphique montre la charge globale de vos entraînements dans le temps.
+                     Il permet de visualiser l’intensité et le volume cumulés, afin d’identifier
+                     les périodes de fatigue, de surcharge ou de récupération.
+                   </p>
+ 
+                   <h4>Comment est-elle calculée ?</h4>
+                   <p>
+                     La charge combine trois éléments :
+                   </p>
+                   <ul>
+                     <li>la durée de l’activité</li>
+                     <li>l’intensité estimée à partir de la vitesse</li>
+                     <li>le dénivelé positif</li>
+                   </ul>
+                   <p>
+                     L’intensité augmente de façon non linéaire : une séance rapide compte
+                     proportionnellement plus qu’une séance facile.
+                   </p>
+ 
+                   <h4>Personnalisation</h4>
+                   <p>
+                     La vitesse de référence est calculée automatiquement à partir de vos sorties
+                     passées pour chaque sport. La charge est donc adaptée à votre niveau et
+                     évolue avec votre forme.
+                   </p>
+ 
+                   <h4>Comment interpréter les valeurs ?</h4>
+                   <p>
+                     La charge est une valeur relative (sans unité). En ordre de grandeur :
+                   </p>
+                   <ul>
+                     <li>≈ 100 : ~1 h d’endurance</li>
+                     <li>200–300 : séance soutenue</li>
+                     <li>350+ : charge élevée</li>
+                   </ul>
+                   <p>
+                     L’important est la comparaison dans le temps, pas la valeur absolue.
+                   </p>
+ 
+                   <h4>Limites</h4>
+                   <p>
+                     Cette estimation ne remplace pas des mesures physiologiques (fréquence
+                     cardiaque, puissance) et ne détecte pas finement les intervalles.
+                   </p>
+                 </div>
+               </div>
+             </div>
+           )}
+           <h3>Charge d'entraînement</h3>
+           <ResponsiveContainer width="100%" height={150}>
+             <AreaChart data={trainingLoadData}>
+               <CartesianGrid strokeDasharray="3 3" vertical={displayPeriod !== "week"} />
+               <XAxis dataKey="key" tick={tickRenderer} height={isMobile ? 40 : 60} interval={0} />
+               <YAxis />
+               <Tooltip labelFormatter={tooltipLabel} />
+               <Area type="monotone" dataKey="value" stroke="#ffc658" fill="#fff1cc" strokeWidth={2} dot={false} activeDot={false} isAnimationActive={false} />
+             </AreaChart>
+           </ResponsiveContainer>
+         </div>
+       </section>
+   )
+ }

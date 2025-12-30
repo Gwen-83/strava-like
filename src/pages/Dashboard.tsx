@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react"
 import { auth, db } from "../firebase"
 import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore"
 import type { ActivitySummary } from "../types/Activity"
 import "../styles/dashboard.css";
 import "../styles/global.css";
 import { useNavigate } from "react-router-dom";
+import { useEffect, useState, useRef } from "react"
 import MainPage from "./MainPage";
 import ChartsPage from "./ChartsPage";
 import ComparisonsStatsPage from "./ComparisonsStatsPage";
@@ -13,6 +13,34 @@ import ProfilePage from "./ProfilePage";
 import { useUser } from "../contexts/UserContext";
 
 function Dashboard() {
+  // detect mobile to change dropdown behavior
+  const [isMobile, setIsMobile] = useState<boolean>(() => typeof window !== "undefined" ? window.matchMedia("(max-width:900px)").matches : false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width:900px)");
+    const handler = (ev: MediaQueryListEvent) => setIsMobile(ev.matches);
+    if (typeof mq.addEventListener === "function") mq.addEventListener("change", handler);
+    else mq.addListener(handler);
+    setIsMobile(mq.matches);
+    return () => {
+      if (typeof mq.removeEventListener === "function") mq.removeEventListener("change", handler);
+      else mq.removeListener(handler);
+    };
+  }, []);
+
+  // refs for dropdowns to detect outside clicks on mobile
+  const analyseRef = useRef<HTMLDivElement | null>(null);
+  const entrainRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (!isMobile) return;
+      if (analyseRef.current && !analyseRef.current.contains(e.target as Node)) setShowAnalyseMenu(false);
+      if (entrainRef.current && !entrainRef.current.contains(e.target as Node)) setShowEntrainementMenu(false);
+    }
+    document.addEventListener("click", onDocClick);
+    return () => document.removeEventListener("click", onDocClick);
+  }, [isMobile]);
+
   const { username } = useUser();
   const [activities, setActivities] = useState<ActivitySummary[]>([])
   const [selected, setSelected] = useState<ActivitySummary | null>(null)
@@ -63,22 +91,21 @@ function Dashboard() {
     return () => unsubscribe()
   }, [])
 
-  function handleStravaImport() {
+  async function handleStravaImport() {
     if (typeof window === "undefined") return;
-
-    const clientId = "163923";
-    const redirectUri = encodeURIComponent(
-      `${window.location.origin}/strava-callback`
-    );
-    const scope = "read,activity:read_all";
-
-    window.location.href =
-      `https://www.strava.com/oauth/authorize` +
-      `?client_id=${clientId}` +
-      `&response_type=code` +
-      `&redirect_uri=${redirectUri}` +
-      `&approval_prompt=force` +
-      `&scope=${scope}`;
+    try {
+      const res = await fetch(`/api/strava-oauth?mode=auth`)
+      const data = await res.json()
+      if (res.ok && data.url) {
+        window.location.href = data.url
+      } else {
+        console.error("Failed to get Strava auth url", data)
+        alert("Impossible de démarrer l'authentification Strava")
+      }
+    } catch (e) {
+      console.error("Strava auth request failed", e)
+      alert("Erreur réseau lors de la connexion à Strava")
+    }
   }
 
   return (
@@ -86,6 +113,7 @@ function Dashboard() {
       <div className="dashboard-inner">
         <header className="dashboard-header" style={{display: "flex", alignItems: "center", gap: 12}}>
           <h2 className="header-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <p></p>
             <span>Dashboard</span>
             {username ? <span style={{ color: "#666", fontSize: 14 }}>({username})</span> : null}
           </h2>
@@ -98,12 +126,12 @@ function Dashboard() {
             >
               Accueil
             </button>
-
             {/* Analyse dropdown (open on hover; click on items changes content) */}
             <div
               className="tab-dropdown"
-              onMouseEnter={() => setShowAnalyseMenu(true)}
-              onMouseLeave={() => setShowAnalyseMenu(false)}
+              ref={analyseRef}
+              onMouseEnter={() => !isMobile && setShowAnalyseMenu(true)}
+              onMouseLeave={() => !isMobile && setShowAnalyseMenu(false)}
               style={{ display: "inline-block", position: "relative", marginRight: 12 }}
             >
               <button
@@ -112,25 +140,34 @@ function Dashboard() {
                 aria-haspopup="menu"
                 aria-expanded={showAnalyseMenu}
                 aria-selected={activeTab === "Analyse"}
+                onClick={() => { if (isMobile) setShowAnalyseMenu(s => !s); else setShowAnalyseMenu(true); }}
               >
                 Analyse ▾
               </button>
-              {showAnalyseMenu && (
-                <div className="tab-dropdown-menu" role="menu">
+               {showAnalyseMenu && (
+                 <div className="tab-dropdown-menu" role="menu">
                   <button role="menuitem" onClick={() => { setAnalysisSubTab("Graphiques"); setActiveTab("Analyse"); setShowAnalyseMenu(false); }}>Graphiques</button>
                   <button role="menuitem" onClick={() => { setAnalysisSubTab("Stats"); setActiveTab("Analyse"); setShowAnalyseMenu(false); }}>Comparaisons & Stats</button>
-                </div>
-              )}
-            </div>
-
-            {/* Entrainement dropdown (pour l'instant un seul item) */}
-            <div
+                 </div>
+               )}
+             </div>
+ 
+             {/* Entrainement dropdown (pour l'instant un seul item) */}
+             <div
               className="tab-dropdown"
-              onMouseEnter={() => setShowEntrainementMenu(true)}
-              onMouseLeave={() => setShowEntrainementMenu(false)}
+              ref={entrainRef}
+              onMouseEnter={() => !isMobile && setShowEntrainementMenu(true)}
+              onMouseLeave={() => !isMobile && setShowEntrainementMenu(false)}
               style={{ display: "inline-block", position: "relative", marginRight: 12 }}
             >
-              <button className="tab-dropdown-toggle" role="button" aria-haspopup="menu" aria-expanded={showEntrainementMenu} aria-selected={activeTab === "Entrainement"}>
+              <button
+                className="tab-dropdown-toggle"
+                role="button"
+                aria-haspopup="menu"
+                aria-expanded={showEntrainementMenu}
+                aria-selected={activeTab === "Entrainement"}
+                onClick={() => { if (isMobile) setShowEntrainementMenu(s => !s); else setShowEntrainementMenu(true); }}
+              >
                 Entrainement ▾
               </button>
               {showEntrainementMenu && (

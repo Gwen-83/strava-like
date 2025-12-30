@@ -95,16 +95,8 @@ export default function ProfilePage() {
 				{email ? (
 					<>
 						<div className="small-muted">{email}</div>
-						<label className="small-muted" style={{ marginTop: 6 }}>Pour changer : modifiez ci-dessous puis cliquez sur Enregistrer.</label>
 					</>
 				) : null}
-				<input
-					className="input"
-					type="email"
-					placeholder="Email de connexion"
-					value={localEmail || ""}
-					onChange={(e) => setLocalEmail(e.target.value)}
-				/>
 			</div>
 
 			<div className="field">

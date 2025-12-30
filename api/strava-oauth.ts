@@ -2,8 +2,8 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node"
 import axios from "axios"
 
-const CLIENT_ID = "163923"
-const CLIENT_SECRET = "bd111e71fbc120784a10044620f775ad70a6f517"
+const CLIENT_ID = process.env.STRAVA_CLIENT_ID
+const CLIENT_SECRET = process.env.STRAVA_CLIENT_SECRET
 
 function logImport(
   level: "INFO" | "WARN" | "ERROR",
@@ -24,11 +24,47 @@ function logImport(
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Si demandé, retourner l'URL d'autorisation (ne jamais exposer CLIENT_SECRET)
+  if (req.query.mode === "auth") {
+    if (!CLIENT_ID) {
+      logImport("ERROR", "Missing STRAVA_CLIENT_ID in env")
+      return res.status(500).json({ error: "Server misconfiguration" })
+    }
+    // tenter de reconstituer l'origine (fallback si absent)
+    const FRONTEND_URL = process.env.FRONTEND_URL
+
+    if (!FRONTEND_URL) {
+      return res.status(500).json({ error: "Missing FRONTEND_URL" })
+    }
+
+    const redirectUri = encodeURIComponent(
+      `${FRONTEND_URL.replace(/\/$/, "")}/strava-callback`
+    )
+
+    const scope = "read,activity:read_all"
+    const authUrl =
+      `https://www.strava.com/oauth/authorize` +
+      `?client_id=${CLIENT_ID}` +
+      `&response_type=code` +
+      `&redirect_uri=${redirectUri}` +
+      `&approval_prompt=force` +
+      `&scope=${scope}`
+
+    logImport("INFO", "Returning Strava auth URL")
+    return res.status(200).json({ url: authUrl })
+  }
+
+  // existing token exchange flow (code param) — utilise CLIENT_ID/CLIENT_SECRET depuis process.env
   const code = req.query.code as string
   if (!code) return res.status(400).json({ error: "Missing code" })
 
   try {
     logImport("INFO", "OAuth exchange started")
+    if (!CLIENT_ID || !CLIENT_SECRET) {
+      logImport("ERROR", "Missing STRAVA_CLIENT_ID or STRAVA_CLIENT_SECRET in env")
+      return res.status(500).json({ error: "Server misconfiguration" })
+    }
+
     // 1️⃣ Échange code → token
     const tokenResponse = await axios.post(
       "https://www.strava.com/oauth/token",

@@ -196,6 +196,298 @@ function ActivityPage() {
     return `${s} s`
   }
 
+  // ajout : helpers d'export
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  const getWeekNumber = (d: Date) => {
+    const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
+    const dayNum = date.getUTCDay() || 7
+    date.setUTCDate(date.getUTCDate() + 4 - dayNum)
+    const yearStart = new Date(Date.UTC(date.getUTCFullYear(),0,1))
+    return Math.ceil((((date as any) - (yearStart as any)) / 86400000 + 1)/7)
+  }
+
+  const computeDerived = (act: ActivityDetails) => {
+    const distance_km = act.distance_m != null ? act.distance_m / 1000 : null
+    const avg_speed_kmh = act.avg_speed_ms != null ? +(act.avg_speed_ms * 3.6).toFixed(2) : null
+    const elevation_per_km = (act.elevation_m != null && distance_km && distance_km > 0) ? +(act.elevation_m / distance_km).toFixed(2) : null
+    const load_per_hour = (act.load != null && act.duration_s && act.duration_s > 0) ? +(act.load / (act.duration_s/3600)).toFixed(2) : null
+
+    let coherence_score = 0
+    if (act.avg_speed_ms != null && act.max_speed_ms != null && act.max_speed_ms > 0) {
+      coherence_score = Math.round(Math.min(100, (act.avg_speed_ms / act.max_speed_ms) * 100))
+    } else {
+      const checks = [
+        !!act.has_gps,
+        !!act.has_power,
+        !!act.avg_hrt
+      ]
+      coherence_score = Math.round((checks.filter(Boolean).length / checks.length) * 100)
+    }
+
+    return { distance_km, avg_speed_kmh, elevation_per_km, load_per_hour, coherence_score }
+  }
+
+  const escapeCsv = (v: any) => {
+    if (v == null) return ""
+    const s = String(v)
+    if (s.includes(",") || s.includes('"') || s.includes("\n")) return `"${s.replace(/"/g, '""')}"`
+    return s
+  }
+
+  const exportCSV = (act: ActivityDetails) => {
+    const d = computeDerived(act)
+    const date = act.startDate instanceof Date ? act.startDate : new Date(act.startDate)
+    const week = getWeekNumber(date)
+    const month = date.getMonth() + 1
+    const year = date.getFullYear()
+
+    const headers = [
+      "date (ISO)", "sport", "distance_km (km)", "dplus_m (m)",
+      "duration_s (s)", "training_load", "week", "month", "year",
+      "avg_speed_kmh (km/h)", "elevation_per_km (m/km)", "load_per_hour", "coherence_score"
+    ]
+
+    const row = [
+      date.toISOString(),
+      act.sport ?? "",
+      d.distance_km != null ? d.distance_km.toFixed(3) : "",
+      act.elevation_m ?? "",
+      act.duration_s ?? "",
+      act.load ?? "",
+      week,
+      month,
+      year,
+      d.avg_speed_kmh != null ? d.avg_speed_kmh.toFixed(2) : "",
+      d.elevation_per_km != null ? d.elevation_per_km : "",
+      d.load_per_hour != null ? d.load_per_hour : "",
+      d.coherence_score
+    ]
+
+    const csv = headers.join(",") + "\n" + row.map(escapeCsv).join(",") + "\n"
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
+    downloadBlob(blob, `activity-${act.id ?? "export"}.csv`)
+  }
+
+  const exportJSON = (act: ActivityDetails) => {
+    // export complet (optionnel) — sans polyline si présentes instructions, mais on propose tout
+    const payload = { ...act }
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" })
+    downloadBlob(blob, `activity-${act.id ?? "export"}.json`)
+  }
+
+  // remplacement : exportImage vertical révisé (fit-to-box + max 2 colonnes + centrage vertical)
+  const FIELD_OPTIONS: { [k: string]: (act: ActivityDetails) => string } = {
+    distance: (a) => {
+      const d = computeDerived(a).distance_km
+      return d != null ? `${d.toFixed(2)} km` : "—"
+    },
+    duration: (a) => a.duration_s != null ? formatDuration(a.duration_s) : "—",
+    dplus: (a) => a.elevation_m != null ? `${a.elevation_m} m` : "—",
+    load: (a) => a.load != null ? `${a.load}` : "—",
+    avg_speed: (a) => {
+      const s = computeDerived(a).avg_speed_kmh
+      return s != null ? `${s.toFixed(1)} km/h` : "—"
+    },
+    coherence: (a) => `${computeDerived(a).coherence_score}/100`,
+  }
+
+  const roundRect = (
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    r: number
+  ) => {
+    ctx.beginPath()
+    ctx.moveTo(x + r, y)
+    ctx.lineTo(x + w - r, y)
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r)
+    ctx.lineTo(x + w, y + h - r)
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h)
+    ctx.lineTo(x + r, y + h)
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r)
+    ctx.lineTo(x, y + r)
+    ctx.quadraticCurveTo(x, y, x + r, y)
+    ctx.closePath()
+  }
+
+  const drawCard = (
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    r = 20,
+    bg = "#ffffff"
+  ) => {
+    ctx.save()
+    ctx.shadowColor = "rgba(0,0,0,0.15)"
+    ctx.shadowBlur = 20
+    ctx.shadowOffsetY = 10
+    ctx.fillStyle = bg
+    roundRect(ctx, x, y, w, h, r)
+    ctx.fill()
+    ctx.restore()
+  }
+
+  const exportImage = async (
+    act: ActivityDetails,
+    opts: { theme?: "light" | "dark"; fields?: string[] } = {}
+  ) => {
+    const width = 1080
+    const height = 1350
+    const canvas = document.createElement("canvas")
+    canvas.width = width
+    canvas.height = height
+    const ctx = canvas.getContext("2d")
+    if (!ctx) return
+
+    const theme = opts.theme ?? "light"
+    const bgTop = theme === "dark" ? "#0f172a" : "#eef2ff"
+    const bgBottom = theme === "dark" ? "#020617" : "#ffffff"
+    const fg = theme === "dark" ? "#e5e7eb" : "#0f172a"
+    const muted = "#6b7280"
+
+    // ─── Background gradient ─────────────────────────────
+    const grad = ctx.createLinearGradient(0, 0, 0, height)
+    grad.addColorStop(0, bgTop)
+    grad.addColorStop(1, bgBottom)
+    ctx.fillStyle = grad
+    ctx.fillRect(0, 0, width, height)
+
+    const pad = 60
+
+    // ─── Map card ────────────────────────────────────────
+    const mapX = pad
+    const mapY = pad
+    const mapW = width - pad * 2
+    const mapH = 620
+
+    drawCard(ctx, mapX, mapY, mapW, mapH, 28, theme === "dark" ? "#020617" : "#ffffff")
+
+    if (act.polyline) {
+      let pts: [number, number][] = []
+      try {
+        pts = decodePolyline(act.polyline)
+      } catch {}
+
+      if (pts.length > 1) {
+        const lats = pts.map(p => p[0])
+        const lngs = pts.map(p => p[1])
+        const minLat = Math.min(...lats)
+        const maxLat = Math.max(...lats)
+        const minLng = Math.min(...lngs)
+        const maxLng = Math.max(...lngs)
+
+        const scale = Math.min(
+          (mapW - 80) / (maxLng - minLng || 0.0001),
+          (mapH - 80) / (maxLat - minLat || 0.0001)
+        )
+
+        ctx.save()
+        ctx.translate(mapX + mapW / 2, mapY + mapH / 2)
+        ctx.beginPath()
+        ctx.lineWidth = 6
+        ctx.strokeStyle = "#2563eb"
+        ctx.lineCap = "round"
+        ctx.lineJoin = "round"
+
+        pts.forEach(([lat, lng], i) => {
+          const x = (lng - (minLng + maxLng) / 2) * scale
+          const y = ((minLat + maxLat) / 2 - lat) * scale
+          i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
+        })
+
+        ctx.stroke()
+        ctx.restore()
+      }
+    }
+
+    // ─── Metrics cards ───────────────────────────────────
+    const fields =
+      opts.fields ??
+      ["distance", "duration", "dplus", "avg_speed"]
+
+    const startY = mapY + mapH + 40
+    const cardW = (width - pad * 2 - 24) / 2
+    const cardH = 160
+
+    fields.slice(0, 4).forEach((key, i) => {
+      const col = i % 2
+      const row = Math.floor(i / 2)
+
+      const x = pad + col * (cardW + 24)
+      const y = startY + row * (cardH + 24)
+
+      drawCard(ctx, x, y, cardW, cardH, 22, theme === "dark" ? "#020617" : "#ffffff")
+
+      ctx.fillStyle = muted
+      ctx.font = "20px sans-serif"
+      ctx.fillText(
+        key === "avg_speed" ? "Vitesse moyenne" :
+        key === "dplus" ? "D+" :
+        key.charAt(0).toUpperCase() + key.slice(1),
+        x + 24,
+        y + 36
+      )
+
+      ctx.fillStyle = fg
+      ctx.font = "48px sans-serif"
+      ctx.fillText(
+        FIELD_OPTIONS[key](act),
+        x + 24,
+        y + 96
+      )
+    })
+
+    // ─── Footer ──────────────────────────────────────────
+    ctx.fillStyle = muted
+    ctx.font = "18px sans-serif"
+    ctx.fillText(
+      `${act.sport ?? ""} • ${act.startDate.toLocaleDateString()}`,
+      pad,
+      height - 40
+    )
+
+    canvas.toBlob(blob => {
+      if (blob) downloadBlob(blob, `activity-${act.id}.png`)
+    })
+  }
+
+
+  // remplacement : handleExport demande ordre et transmet à exportImage
+  const handleExport = async () => {
+    if (!activity) return
+    const choice = (window.prompt("Format d'export: tapez csv / image / json", "csv") || "").trim().toLowerCase()
+    if (choice === "csv") {
+      exportCSV(activity)
+    } else if (choice === "image") {
+      // show available fields and allow user to provide ordered, comma-separated keys
+      const available = Object.keys(FIELD_OPTIONS).join(", ")
+      const input = (window.prompt(`Champs à inclure et ordre (séparés par des virgules). Options: ${available}\nEx: distance,duration,avg_speed`, "distance,duration,avg_speed") || "").trim()
+      const requested = input.split(",").map(s => s.trim()).filter(Boolean)
+      const valid = requested.filter(r => FIELD_OPTIONS[r])
+      const fields = valid.length > 0 ? valid : undefined
+      const themeChoice = (window.prompt("Thème: light / dark", "light") || "light").trim().toLowerCase()
+      await exportImage(activity, { theme: themeChoice === "dark" ? "dark" : "light", fields })
+    } else if (choice === "json") {
+      exportJSON(activity)
+    } else {
+      // cancel / invalid
+    }
+  }
+
   if (loading) return <p>Chargement de l'activité…</p>
   if (!activity) return <p>Activité introuvable</p>
 
@@ -282,7 +574,7 @@ function ActivityPage() {
             <p className="small">Importée le: {activity.createdAt.toLocaleString()}</p>
             <p className="small">GPS: {activity.has_gps ? "Oui" : "Non"} · Streams: {activity.has_streams ? "Oui" : "Non"}</p>
             <div style={{ marginTop:8 }}>
-              <button className="secondary" onClick={() => alert("Fonctionnalité à venir")}>Exporter</button>
+              <button className="secondary" onClick={handleExport}>Exporter</button>
               <button style={{ marginLeft:8 }} onClick={() => alert("Partage à venir")}>Partager</button>
             </div>
           </div>

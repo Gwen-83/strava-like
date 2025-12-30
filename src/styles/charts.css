@@ -41,8 +41,13 @@
 
 /* Make charts more compact on small screens */
 @media (max-width:900px) {
-  .chart-card { padding: 12px }
+  .chart-card { padding: 10px }
   .chart-card h3 { font-size: 15px }
+  /* Slightly reduce help button and overlay padding */
+  .chart-help-button { top: 8px; right: 8px; width: 32px; height: 32px; font-size: 13px; }
+  .chart-help-content { padding: 10px 12px; max-width: 92%; }
+  /* Ensure chart containers can shrink cleanly */
+  .charts-grid { padding-left: 10px; padding-right: 10px; }
 }
 
 /* Tooltip dark theme for better contrast */
@@ -154,4 +159,55 @@
   color: var(--text);
   cursor: pointer;
   font-size: 18px;
+}
+
+/* Prevent text selection and mobile tap highlight inside charts */
+.charts-grid,
+.chart-card,
+.chart-card * ,
+.recharts-wrapper,
+.recharts-surface,
+.recharts-layer {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation; /* allow normal scrolling while enabling touch events */
+}
+
+/* Remove pointer cursor and interactive outlines on SVG shapes so touch only shows tooltip */
+.recharts-rectangle,
+.recharts-bar-rectangle,
+.recharts-area-dot,
+.recharts-area,
+.recharts-line,
+.recharts-surface svg rect,
+.recharts-surface svg g {
+  cursor: default !important;
+  outline: none !important;
+}
+
+/* Remove hover/active visual changes for bars/areas (no stroke, no opacity change) */
+.recharts-bar-rectangle:hover,
+.recharts-bar-rectangle:active,
+.recharts-rectangle:hover,
+.recharts-area:hover,
+.recharts-area-dot:hover {
+  opacity: 1 !important;
+  stroke: none !important;
+  stroke-width: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Make legend non-interactive on touch */
+.recharts-legend-item {
+  pointer-events: none !important;
+  cursor: default !important;
+}
+
+/* Ensure tooltip itself doesn't become selectable */
+.recharts-tooltip-wrapper {
+  -webkit-user-select: none;
+  user-select: none;
 }
