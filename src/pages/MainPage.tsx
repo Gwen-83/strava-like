@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react"
 import { useUser } from "../contexts/UserContext"
 import type { ActivitySummary } from "../types/Activity"
+import { predictPerformance } from "../utils/guess"
 import "../styles/main.css"
 
 function formatDuration(s: number) {
@@ -171,6 +172,14 @@ export default function MainPage({
       .sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())
       .slice(0, 5)
   }, [activities])
+
+  const performance = useMemo(() => {
+    try {
+      return predictPerformance(activities, totals.load28, totals.load7)
+    } catch {
+      return { running: null, cycling: null, confidence: { running: "medium", cycling: "medium" } }
+    }
+  }, [activities, totals.load28, totals.load7])
 
   // calendar for current month
   const calendar = useMemo(() => {
@@ -542,6 +551,38 @@ export default function MainPage({
               ))}
             </ul>
           </div>
+        </div>
+
+        {/* Predictions panel (avant la partie Objectifs) */}
+        <div style={{ width: 300, border: "1px solid #eee", padding: 10, borderRadius: 6, marginRight: 12 }}>
+          <h3>Prédictions</h3>
+          {performance.running ? (
+            <div style={{ marginBottom: 10 }}>
+              <strong>Course</strong>
+              <div style={{ fontSize: 13 }}>
+                <div>5 km: {formatDuration((performance.running as Record<string, number>)["5km"])}</div>
+                <div>10 km: {formatDuration((performance.running as Record<string, number>)["10km"])}</div>
+                <div>21.1 km: {formatDuration((performance.running as Record<string, number>)["21.1km"])}</div>
+                <div>Marathon: {formatDuration((performance.running as Record<string, number>)["42.2km"])}</div>
+              </div>
+              <div style={{ fontSize: 12, color: "#666" }}>Confiance: {performance.confidence.running}</div>
+            </div>
+          ) : (
+            <div className="small-muted">Pas assez de données pour prédictions course.</div>
+          )}
+
+          {performance.cycling ? (
+            <div>
+              <strong>Cyclisme</strong>
+              <div style={{ fontSize: 13 }}>
+                <div>FTP estimé: {Math.round(performance.cycling.ftp)}</div>
+                <div>P20 estimée: {Math.round(performance.cycling.p20)}</div>
+              </div>
+              <div style={{ fontSize: 12, color: "#666" }}>Confiance: {performance.confidence.cycling}</div>
+            </div>
+          ) : (
+            <div className="small-muted">Pas assez de données pour prédictions cyclisme.</div>
+          )}
         </div>
 
         {/* Objectives panel */}

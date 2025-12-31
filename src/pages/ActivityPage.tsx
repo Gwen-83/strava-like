@@ -4,6 +4,7 @@ import { doc, getDoc } from "firebase/firestore"
 import { db } from "../firebase"
 import type { ActivityDetails } from "../types/Activity"
 import { reverseGeocode } from "../services/geocoding"
+import exportImage from "../services/exportImage"
 
 function ActivityPage() {
   const { id } = useParams<{ id: string }>()
@@ -340,131 +341,6 @@ function ActivityPage() {
     ctx.fill()
     ctx.restore()
   }
-
-  const exportImage = async (
-    act: ActivityDetails,
-    opts: { theme?: "light" | "dark"; fields?: string[] } = {}
-  ) => {
-    const width = 1080
-    const height = 1350
-    const canvas = document.createElement("canvas")
-    canvas.width = width
-    canvas.height = height
-    const ctx = canvas.getContext("2d")
-    if (!ctx) return
-
-    const theme = opts.theme ?? "light"
-    const bgTop = theme === "dark" ? "#0f172a" : "#eef2ff"
-    const bgBottom = theme === "dark" ? "#020617" : "#ffffff"
-    const fg = theme === "dark" ? "#e5e7eb" : "#0f172a"
-    const muted = "#6b7280"
-
-    // ─── Background gradient ─────────────────────────────
-    const grad = ctx.createLinearGradient(0, 0, 0, height)
-    grad.addColorStop(0, bgTop)
-    grad.addColorStop(1, bgBottom)
-    ctx.fillStyle = grad
-    ctx.fillRect(0, 0, width, height)
-
-    const pad = 60
-
-    // ─── Map card ────────────────────────────────────────
-    const mapX = pad
-    const mapY = pad
-    const mapW = width - pad * 2
-    const mapH = 620
-
-    drawCard(ctx, mapX, mapY, mapW, mapH, 28, theme === "dark" ? "#020617" : "#ffffff")
-
-    if (act.polyline) {
-      let pts: [number, number][] = []
-      try {
-        pts = decodePolyline(act.polyline)
-      } catch {}
-
-      if (pts.length > 1) {
-        const lats = pts.map(p => p[0])
-        const lngs = pts.map(p => p[1])
-        const minLat = Math.min(...lats)
-        const maxLat = Math.max(...lats)
-        const minLng = Math.min(...lngs)
-        const maxLng = Math.max(...lngs)
-
-        const scale = Math.min(
-          (mapW - 80) / (maxLng - minLng || 0.0001),
-          (mapH - 80) / (maxLat - minLat || 0.0001)
-        )
-
-        ctx.save()
-        ctx.translate(mapX + mapW / 2, mapY + mapH / 2)
-        ctx.beginPath()
-        ctx.lineWidth = 6
-        ctx.strokeStyle = "#2563eb"
-        ctx.lineCap = "round"
-        ctx.lineJoin = "round"
-
-        pts.forEach(([lat, lng], i) => {
-          const x = (lng - (minLng + maxLng) / 2) * scale
-          const y = ((minLat + maxLat) / 2 - lat) * scale
-          i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
-        })
-
-        ctx.stroke()
-        ctx.restore()
-      }
-    }
-
-    // ─── Metrics cards ───────────────────────────────────
-    const fields =
-      opts.fields ??
-      ["distance", "duration", "dplus", "avg_speed"]
-
-    const startY = mapY + mapH + 40
-    const cardW = (width - pad * 2 - 24) / 2
-    const cardH = 160
-
-    fields.slice(0, 4).forEach((key, i) => {
-      const col = i % 2
-      const row = Math.floor(i / 2)
-
-      const x = pad + col * (cardW + 24)
-      const y = startY + row * (cardH + 24)
-
-      drawCard(ctx, x, y, cardW, cardH, 22, theme === "dark" ? "#020617" : "#ffffff")
-
-      ctx.fillStyle = muted
-      ctx.font = "20px sans-serif"
-      ctx.fillText(
-        key === "avg_speed" ? "Vitesse moyenne" :
-        key === "dplus" ? "D+" :
-        key.charAt(0).toUpperCase() + key.slice(1),
-        x + 24,
-        y + 36
-      )
-
-      ctx.fillStyle = fg
-      ctx.font = "48px sans-serif"
-      ctx.fillText(
-        FIELD_OPTIONS[key](act),
-        x + 24,
-        y + 96
-      )
-    })
-
-    // ─── Footer ──────────────────────────────────────────
-    ctx.fillStyle = muted
-    ctx.font = "18px sans-serif"
-    ctx.fillText(
-      `${act.sport ?? ""} • ${act.startDate.toLocaleDateString()}`,
-      pad,
-      height - 40
-    )
-
-    canvas.toBlob(blob => {
-      if (blob) downloadBlob(blob, `activity-${act.id}.png`)
-    })
-  }
-
 
   // remplacement : handleExport demande ordre et transmet à exportImage
   const handleExport = async () => {
