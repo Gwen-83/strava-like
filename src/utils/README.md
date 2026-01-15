@@ -41,22 +41,6 @@
 - **`activityAnalytics.ts`** - Réexporte depuis trainingLoadCalculator (backwards compat)
 - **`guess.ts`** - Point d'entrée pour les prédictions consolidées
 
-## Élimination des doublons
-
-### Avant nettoyage
-- **Constants** dupliquées dans 4 fichiers
-- **Calculs training load** répétés à l'identique 3 fois
-- **Fonctions dates** dupliquées dans aggregates, comparisons, guess
-- **File guess.ts** gigantesque (520 lignes) mélangeant tout
-
-### Après nettoyage
-- ✅ Constants centralisées dans `constants.ts`
-- ✅ Training load unique source de vérité dans `trainingLoadCalculator.ts`
-- ✅ Date helpers centralisés dans `dateHelpers.ts`
-- ✅ Logic métier séparée par domaine (running, cycling, coherence)
-- ✅ Code ~70% plus petit et lisible
-- ✅ Aucune régression - tous les exports conservés
-
 ## Dépendances
 
 ```

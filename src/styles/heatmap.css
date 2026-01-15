@@ -1,0 +1,87 @@
+.heatmap-section {
+  padding: 24px;
+  background-color: white;
+  border-radius: 8px;
+  margin-bottom: 24px;
+}
+
+.heatmap-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background-color: #f5f5f5;
+}
+
+.heatmap-page main {
+  flex: 1;
+  overflow: auto;
+}
+
+.heatmap-page .controls-header {
+  background-color: white;
+  border-bottom: 1px solid #e0e0e0;
+  padding: 16px;
+}
+
+.heatmap-page .controls-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.heatmap-page .filters {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.heatmap-page .filter-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.heatmap-page .filter-item label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #666;
+}
+
+.heatmap-page select,
+.heatmap-page input[type="date"] {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.875rem;
+}
+
+.heatmap-page .checkbox-item label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.heatmap-page .range-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.heatmap-page .badge {
+  background-color: #f0f0f0;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 0.875rem;
+}
+
+.heatmap-page .badge.scope {
+  background-color: #e3f2fd;
+  color: #1976d2;
+  font-weight: 500;
+}
+
+/* Fix Leaflet */
+.leaflet-container {
+  font-family: inherit;
+  background: white;
+}

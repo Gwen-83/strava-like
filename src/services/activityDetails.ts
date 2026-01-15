@@ -62,38 +62,38 @@ export async function getActivityDetails(
 
   const data = snap.data()
 
-return {
-  id,
-  userId: data.userId,
-  source: data.source,
-  externalId: data.externalId,
+  return {
+    id,
+    userId: data.userId,
+    source: data.source,
+    externalId: data.externalId,
 
-  sport: data.sport,
-  startDate: data.startDate.toDate(),
+    sport: data.sport,
+    startDate: data.startDate.toDate(),
 
-  distance_m: data.distance_m,
-  duration_s: data.duration_s,
-  // elevation_m peut être absent dans la base
-  elevation_m: data.elevation_m ?? undefined,
-  max_elevation: data.elev_high ?? undefined,
-  min_elevation: data.elev_low ?? undefined,
+    distance_m: data.distance_m,
+    duration_s: data.duration_s,
+    elevation_m: data.elevation_m ?? undefined,
+    max_elevation: data.max_elevation ?? undefined,
+    min_elevation: data.min_elevation ?? undefined,
 
-  avg_speed_ms: data.avg_speed_ms ?? undefined,
-  max_speed_ms: data.max_speed_ms ?? undefined,
-  avg_watts: data.avg_watts ?? undefined,
-  energy_kj: data.energy_kj ?? undefined,
-  avg_hrt: data.average_heartrate ?? undefined,
-  max_hrt: data.max_heartrate ?? undefined,
+    avg_speed_ms: data.avg_speed_ms ?? undefined,
+    max_speed_ms: data.max_speed_ms ?? undefined,
+    avg_watts: data.avg_watts ?? undefined,
+    energy_kj: data.energy_kj ?? undefined,
+    avg_hrt: data.avg_hrt ?? undefined,
+    max_hrt: data.max_hrt ?? undefined,
 
-  has_gps: data.has_gps,
-  has_streams: data.has_streams,
-  has_power: data.has_power,
+    has_gps: data.has_gps,
+    has_streams: data.has_streams,
+    has_power: data.has_power,
 
-  polyline: data.polyline ?? null,
-  startLatLng: data.startLatLng ?? null,
-  endLatLng: data.endLatLng ?? null,
-  streams: data.streams ?? null,
+    // 🗺️ CLÉS IMPORTANTES
+    polyline: data.polyline ?? null,
+    startLatLng: data.startLatLng ?? null,
+    endLatLng: data.endLatLng ?? null,
+    streams: data.streams ?? null,
 
-  createdAt: data.createdAt.toDate(),
-}
+    createdAt: data.createdAt.toDate(),
+  } as ActivityDetails
 }

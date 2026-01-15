@@ -2,6 +2,9 @@ import { useState } from "react"
 import type { ActivitySummary } from "../types/Activity"
 import { comparePeriods, filterByPeriod } from "../utils/comparisons"
 import { calculateActivityStats } from "../utils/activityAnalytics"
+import { enrichActivitiesWithGeoPoints } from "../utils/geoUtils"
+import { useActivityDetails } from "../hooks/useActivityDetails"
+import { HeatmapViewer } from "../components/HeatmapViewer"
 import "../styles/comparisons.css"
 
 function fmtRangeLabel(start?: Date, end?: Date) {
@@ -18,7 +21,18 @@ export default function ComparisonsStatsPage({ activities }: { activities: Activ
   const [baseDate, setBaseDate] = useState<string>(todayIso)
   const [applyPeriodToStats, setApplyPeriodToStats] = useState<boolean>(false)
 
-  const filteredActivities = activities.filter(a => sportFilter === "All" || a.sport === sportFilter)
+  // Charger les détails des activités (polyline, coordinates, etc.)
+  const { enrichedActivities } = useActivityDetails(activities)
+
+  // Enrichir avec geoPoints
+  const enrichedWithGeo = enrichActivitiesWithGeoPoints(enrichedActivities)
+  
+  const filteredActivities = enrichedWithGeo.filter(a => sportFilter === "All" || a.sport === sportFilter)
+
+  // Heatmap: appliquer le filtre de période SI cochée
+  const heatmapActivities = applyPeriodToStats
+    ? filterByPeriod(filteredActivities, periodType, new Date(baseDate), 0).activities
+    : filteredActivities
 
   const statsActivities = applyPeriodToStats
     ? filterByPeriod(filteredActivities, periodType, new Date(baseDate), 0).activities
@@ -183,6 +197,25 @@ export default function ComparisonsStatsPage({ activities }: { activities: Activ
               </div>
             </div>
           </div>
+        </section>
+
+        <section className="heatmap-section" aria-label="Carte de chaleur">
+          <h3 className="section-title">Localisation des activités</h3>
+          {heatmapActivities.length === 0 ? (
+            <p style={{ color: "#999", padding: "20px" }}>Aucune activité</p>
+          ) : (
+            <>
+              <p style={{ fontSize: "0.875rem", color: "#666", marginBottom: "12px" }}>
+                {heatmapActivities.filter(a => a.geoPoints?.length > 0).length} / {heatmapActivities.length} activités avec coordonnées GPS
+                {heatmapActivities.filter(a => a.geoPoints?.length > 0).length === 0 && (
+                  <span style={{ marginLeft: "12px", color: "#ff6b6b", fontWeight: "bold" }}>
+                    ⚠️ Aucune coordonnée GPS trouvée dans cette période
+                  </span>
+                )}
+              </p>
+              <HeatmapViewer activities={heatmapActivities} height="500px" />
+            </>
+          )}
         </section>
       </main>
     </div>

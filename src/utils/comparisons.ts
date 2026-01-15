@@ -21,9 +21,10 @@ export interface ComparisonResult {
   previousRange: { start: Date; end: Date }
 }
 
-export interface FilteredPeriod {
+export type FilteredPeriod = {
   activities: ActivitySummary[]
-  range: { start: Date; end: Date }
+  start: Date
+  end: Date
 }
 
 /**
@@ -65,13 +66,16 @@ export function comparePeriods(
  */
 export function filterByPeriod(
   activities: ActivitySummary[],
-  period: PeriodType,
-  baseDate: Date = new Date(),
-  offset = 0
+  periodType: "week" | "month" | "year",
+  baseDate: Date,
+  offset: number
 ): FilteredPeriod {
-  const range = getPeriodRange(period, baseDate, offset)
+  const { start, end } = getPeriodRange(periodType, baseDate, offset)
+  const filtered = filterByRange(activities, start, end)
+
   return {
-    activities: filterByRange(activities, range.start, range.end),
-    range,
+    activities: filtered,
+    start,
+    end,
   }
 }

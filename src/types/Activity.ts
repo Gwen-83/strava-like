@@ -33,6 +33,8 @@ export type ActivitySummary = {
 
   createdAt: Date
   isSuspicious?: boolean
+
+  geoPoints?: Array<{ lat: number; lng: number }> // Ajouter cette ligne si absente
 }
 
 export type ActivityStream = {
