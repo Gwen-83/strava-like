@@ -285,57 +285,12 @@ function ActivityPage() {
     downloadBlob(blob, `activity-${act.id ?? "export"}.json`)
   }
 
-  // remplacement : exportImage vertical révisé (fit-to-box + max 2 colonnes + centrage vertical)
-  const FIELD_OPTIONS: { [k: string]: (act: ActivityDetails) => string } = {
-    distance: (a) => {
-      const d = computeDerived(a).distance_km
-      return d != null ? `${d.toFixed(2)} km` : "—"
-    },
-    duration: (a) => a.duration_s != null ? formatDuration(a.duration_s) : "—",
-    dplus: (a) => a.elevation_m != null ? `${a.elevation_m} m` : "—",
-    load: (a) => a.load != null ? `${a.load}` : "—",
-    avg_speed: (a) => {
-      const s = computeDerived(a).avg_speed_kmh
-      return s != null ? `${s.toFixed(1)} km/h` : "—"
-    },
-    coherence: (a) => `${computeDerived(a).coherence_score}/100`,
-  }
-
-  const roundRect = (
-    ctx: CanvasRenderingContext2D,
-    x: number,
-    y: number,
-    w: number,
-    h: number,
-    r: number
-  ) => {
-    ctx.beginPath()
-    ctx.moveTo(x + r, y)
-    ctx.lineTo(x + w - r, y)
-    ctx.quadraticCurveTo(x + w, y, x + w, y + r)
-    ctx.lineTo(x + w, y + h - r)
-    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h)
-    ctx.lineTo(x + r, y + h)
-    ctx.quadraticCurveTo(x, y + h, x, y + h - r)
-    ctx.lineTo(x, y + r)
-    ctx.quadraticCurveTo(x, y, x + r, y)
-    ctx.closePath()
-  }
-
   // remplacement : handleExport demande ordre et transmet à exportImage
   const handleExport = async () => {
     if (!activity) return
     const choice = (window.prompt("Format d'export: tapez csv / image / json", "csv") || "").trim().toLowerCase()
     if (choice === "csv") {
       exportCSV(activity)
-    } else if (choice === "image") {
-      // show available fields and allow user to provide ordered, comma-separated keys
-      const available = Object.keys(FIELD_OPTIONS).join(", ")
-      const input = (window.prompt(`Champs à inclure et ordre (séparés par des virgules). Options: ${available}\nEx: distance,duration,avg_speed`, "distance,duration,avg_speed") || "").trim()
-      const requested = input.split(",").map(s => s.trim()).filter(Boolean)
-      const valid = requested.filter(r => FIELD_OPTIONS[r])
-      const fields = valid.length > 0 ? valid : undefined
-      const themeChoice = (window.prompt("Thème: light / dark", "light") || "light").trim().toLowerCase()
     } else if (choice === "json") {
       exportJSON(activity)
     } else {
