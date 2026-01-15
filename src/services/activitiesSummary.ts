@@ -43,6 +43,7 @@ export async function upsertActivitySummary(
       source: activity.source,
 
       sport: activity.sport,
+      manualSportOverride: activity.manualSportOverride ?? false,
       startDate: Timestamp.fromDate(activity.startDate),
 
       distance_m: activity.distance_m,

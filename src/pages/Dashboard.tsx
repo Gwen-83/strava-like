@@ -1,9 +1,9 @@
 import { auth, db } from "../firebase"
 import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore"
-import type { ActivitySummary } from "../types/Activity"
+import type { ActivitySummary, ActivityDetails } from "../types/Activity"
 import "../styles/dashboard.css";
 import "../styles/global.css";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useState, useRef } from "react"
 import MainPage from "./MainPage";
 import ChartsPage from "./ChartsPage";
@@ -11,6 +11,8 @@ import ComparisonsStatsPage from "./ComparisonsStatsPage";
 import ActivitiesPage from "./ActivitiesPage";
 import ProfilePage from "./ProfilePage";
 import { useUser } from "../contexts/UserContext";
+import { upsertActivitySummary } from "../services/activitiesSummary";
+import { upsertActivityDetails } from "../services/activityDetails";
 
 function Dashboard() {
   // detect mobile to change dropdown behavior
@@ -44,7 +46,10 @@ function Dashboard() {
   const { username } = useUser();
   const [activities, setActivities] = useState<ActivitySummary[]>([])
   const [selected, setSelected] = useState<ActivitySummary | null>(null)
-  const [activeTab, setActiveTab] = useState<"Accueil" | "Analyse" | "Entrainement" | "Profil">("Accueil")
+  const location = useLocation();
+  const [activeTab, setActiveTab] = useState<"Accueil" | "Analyse" | "Entrainement" | "Profil">(
+    (location.state?.activeTab as any) || "Accueil"
+  );
   const [analysisSubTab, setAnalysisSubTab] = useState<"Graphiques" | "Stats">("Graphiques")
   const [showAnalyseMenu, setShowAnalyseMenu] = useState(false)
   const [showEntrainementMenu, setShowEntrainementMenu] = useState(false)
@@ -105,6 +110,35 @@ function Dashboard() {
     } catch (e) {
       console.error("Strava auth request failed", e)
       alert("Erreur réseau lors de la connexion à Strava")
+    }
+  }
+
+  async function handleFileImport(activity: ActivityDetails) {
+    if (!auth.currentUser) {
+      alert("Vous devez être connecté pour importer une activité")
+      return
+    }
+
+    try {
+      // Sauvegarder le résumé de l'activité
+      const activityId = await upsertActivitySummary({
+        ...activity,
+        userId: auth.currentUser.uid,
+      })
+
+      // Sauvegarder les détails de l'activité
+      await upsertActivityDetails({
+        ...activity,
+        id: activityId,
+        userId: auth.currentUser.uid,
+      })
+
+      alert(`✅ Activité importée avec succès!`)
+    } catch (error) {
+      console.error("Erreur lors de la sauvegarde de l'activité:", error)
+      throw new Error(
+        `Erreur lors de la sauvegarde: ${error instanceof Error ? error.message : "erreur inconnue"}`
+      )
     }
   }
 
@@ -199,7 +233,12 @@ function Dashboard() {
             <ComparisonsStatsPage activities={activities} />
           )}
           {activeTab === "Entrainement" && (
-            <ActivitiesPage activities={activities} onSelect={setSelected} />
+            <ActivitiesPage 
+              activities={activities} 
+              onSelect={setSelected}
+              userId={auth.currentUser?.uid}
+              onFileImport={handleFileImport}
+            />
           )}
           {activeTab === "Profil" && (
             <ProfilePage />

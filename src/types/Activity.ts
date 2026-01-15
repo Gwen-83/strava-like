@@ -9,6 +9,7 @@ export type ActivitySummary = {
   source: ActivitySource
 
   sport: SportType
+  manualSportOverride?: boolean // true si le sport a été choisi manuellement lors de l'import
 
   startDate: Date
   duration_s: number

@@ -71,6 +71,7 @@ export default function MainPage({
     const distance30 = sum(in30, (a) => a.distance_m ?? 0)
     const elev30 = sum(in30, (a) => a.elevation_m ?? 0)
     const time30s = sum(in30, (a) => a.duration_s ?? 0)
+    const count30 = in30.length
 
     // Use calculateActivityTrainingLoad for consistent load calculation across pages
     const load30 = sum(in30, (a) => calculateActivityTrainingLoad(a, REF_SPEEDS_KMH))
@@ -98,6 +99,7 @@ export default function MainPage({
       distance30,
       elev30,
       time30s,
+      count30,
       load30,
       load7,
       load28,
@@ -230,6 +232,105 @@ export default function MainPage({
 
     return { Vn, Vn_1, deltaPct, delta, R, message, kind, coherenceScore, weeklyTotals, wkMean, wkStd }
   }, [activities, REF_SPEEDS_KMH, calendar.year, calendar.month])
+  // --- END ADD ---
+
+  // --- ADD: monthly records computation ---
+  const monthlyRecords = useMemo(() => {
+    if (activities.length === 0) {
+      return {
+        longestStreak: { count: 0, startDate: null, endDate: null },
+        maxDistance: { value: 0, month: null, year: null, monthName: "" },
+        maxElevation: { value: 0, month: null, year: null, monthName: "" },
+        maxTime: { value: 0, month: null, year: null, monthName: "" },
+        maxLoad: { value: 0, month: null, year: null, monthName: "" },
+      }
+    }
+
+    // Group activities by month
+    const byMonth = new Map<string, ActivitySummary[]>()
+    activities.forEach((a) => {
+      const d = new Date(a.startDate)
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+      const arr = byMonth.get(key) ?? []
+      arr.push(a)
+      byMonth.set(key, arr)
+    })
+
+    let maxDistanceMonth = { value: 0, key: "", distance: 0 }
+    let maxElevationMonth = { value: 0, key: "", elevation: 0 }
+    let maxTimeMonth = { value: 0, key: "", time: 0 }
+    let maxLoadMonth = { value: 0, key: "", load: 0 }
+
+    byMonth.forEach((activitiesInMonth, key) => {
+      const dist = activitiesInMonth.reduce((s, a) => s + (a.distance_m ?? 0), 0)
+      const elev = activitiesInMonth.reduce((s, a) => s + (a.elevation_m ?? 0), 0)
+      const time = activitiesInMonth.reduce((s, a) => s + (a.duration_s ?? 0), 0)
+      const load = activitiesInMonth.reduce((s, a) => s + calculateActivityTrainingLoad(a, REF_SPEEDS_KMH), 0)
+
+      if (dist > maxDistanceMonth.value) {
+        maxDistanceMonth = { value: dist, key, distance: dist }
+      }
+      if (elev > maxElevationMonth.value) {
+        maxElevationMonth = { value: elev, key, elevation: elev }
+      }
+      if (time > maxTimeMonth.value) {
+        maxTimeMonth = { value: time, key, time }
+      }
+      if (load > maxLoadMonth.value) {
+        maxLoadMonth = { value: load, key, load }
+      }
+    })
+
+    // Compute longest consecutive days with activity
+    const sortedActivities = [...activities].sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
+    const daysWithActivity = new Set(sortedActivities.map((a) => dayKey(new Date(a.startDate))))
+    let longestStreak = { count: 0, startDate: null as Date | null, endDate: null as Date | null }
+    let currentStreak = { count: 0, startDate: null as Date | null }
+
+    const dayMs = 24 * 60 * 60 * 1000
+    let checkDate = sortedActivities.length > 0 ? startOfDay(new Date(sortedActivities[0].startDate)) : new Date()
+    const endDate = startOfDay(new Date())
+
+    while (checkDate <= endDate) {
+      if (daysWithActivity.has(dayKey(checkDate))) {
+        if (currentStreak.count === 0) {
+          currentStreak.startDate = new Date(checkDate)
+        }
+        currentStreak.count++
+      } else {
+        if (currentStreak.count > longestStreak.count) {
+          longestStreak = {
+            count: currentStreak.count,
+            startDate: currentStreak.startDate,
+            endDate: new Date(checkDate.getTime() - dayMs),
+          }
+        }
+        currentStreak = { count: 0, startDate: null }
+      }
+      checkDate = new Date(checkDate.getTime() + dayMs)
+    }
+    if (currentStreak.count > longestStreak.count) {
+      longestStreak = {
+        count: currentStreak.count,
+        startDate: currentStreak.startDate,
+        endDate: new Date(endDate),
+      }
+    }
+
+    const parseMonthKey = (key: string) => {
+      const [year, month] = key.split("-")
+      const monthNames = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"]
+      return { year: parseInt(year), month: parseInt(month) - 1, monthName: monthNames[parseInt(month) - 1] }
+    }
+
+    return {
+      longestStreak,
+      maxDistance: maxDistanceMonth.key ? { value: maxDistanceMonth.distance, ...parseMonthKey(maxDistanceMonth.key) } : { value: 0, year: null, month: null, monthName: "" },
+      maxElevation: maxElevationMonth.key ? { value: maxElevationMonth.elevation, ...parseMonthKey(maxElevationMonth.key) } : { value: 0, year: null, month: null, monthName: "" },
+      maxTime: maxTimeMonth.key ? { value: maxTimeMonth.time, ...parseMonthKey(maxTimeMonth.key) } : { value: 0, year: null, month: null, monthName: "" },
+      maxLoad: maxLoadMonth.key ? { value: maxLoadMonth.load, ...parseMonthKey(maxLoadMonth.key) } : { value: 0, year: null, month: null, monthName: "" },
+    }
+  }, [activities, REF_SPEEDS_KMH])
   // --- END ADD ---
 
   const monthHasActivity = (day: number) => {
@@ -371,8 +472,8 @@ export default function MainPage({
             </div>
           )}
           <br></br>
-        <h3>Résumé (30 derniers jours)</h3>
-        <div style={{ display: "grid", gap: 8 }}>
+        <div style={{ display: "grid", gap: 8, border: "1px solid #eee", padding: 12, borderRadius: 8 }}>
+          <h3>Résumé (30 derniers jours)</h3>
           <div>
             <strong>Total distance:</strong> {fmtKm(totals.distance30)}
           </div>
@@ -391,7 +492,59 @@ export default function MainPage({
             {totals.variation30Pct.toFixed(0)}%
           </div>
           <div style={{marginTop:16}}>
-            <strong>Total activités:</strong> {activities.length}
+            <strong>Activités (30j):</strong> {totals.count30}
+          </div>
+        </div>
+
+        {/* Monthly records */}
+        <div style={{ marginTop: 20, border: "1px solid #eee", padding: 12, borderRadius: 8 }}>
+          <h3 style={{ marginTop: 0 }}>Records mensuels</h3>
+          <div style={{ display: "grid", gap: 8, fontSize: 14 }}>
+            <div>
+              <strong>Plus longue série:</strong> {monthlyRecords.longestStreak.count} jour(s)
+              {monthlyRecords.longestStreak.startDate && monthlyRecords.longestStreak.endDate && (
+                <span style={{ fontSize: 12, color: "#666" }}>
+                  {" "}
+                  ({monthlyRecords.longestStreak.startDate.toLocaleDateString()} - {monthlyRecords.longestStreak.endDate.toLocaleDateString()})
+                </span>
+              )}
+            </div>
+            <div>
+              <strong>Plus grande distance:</strong> {fmtKm(monthlyRecords.maxDistance.value)}
+              {monthlyRecords.maxDistance.year && (
+                <span style={{ fontSize: 12, color: "#666" }}>
+                  {" "}
+                  ({monthlyRecords.maxDistance.monthName} {monthlyRecords.maxDistance.year})
+                </span>
+              )}
+            </div>
+            <div>
+              <strong>Plus gros dénivelé:</strong> {Math.round(monthlyRecords.maxElevation.value)} m
+              {monthlyRecords.maxElevation.year && (
+                <span style={{ fontSize: 12, color: "#666" }}>
+                  {" "}
+                  ({monthlyRecords.maxElevation.monthName} {monthlyRecords.maxElevation.year})
+                </span>
+              )}
+            </div>
+            <div>
+              <strong>Plus long temps:</strong> {formatDuration(monthlyRecords.maxTime.value)}
+              {monthlyRecords.maxTime.year && (
+                <span style={{ fontSize: 12, color: "#666" }}>
+                  {" "}
+                  ({monthlyRecords.maxTime.monthName} {monthlyRecords.maxTime.year})
+                </span>
+              )}
+            </div>
+            <div>
+              <strong>Plus grosse charge:</strong> {Math.round(monthlyRecords.maxLoad.value)}
+              {monthlyRecords.maxLoad.year && (
+                <span style={{ fontSize: 12, color: "#666" }}>
+                  {" "}
+                  ({monthlyRecords.maxLoad.monthName} {monthlyRecords.maxLoad.year})
+                </span>
+              )}
+            </div>
           </div>
         </div>
 

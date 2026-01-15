@@ -351,7 +351,13 @@ function ActivityPage() {
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
         <h2>Détails de l'activité</h2>
         <div style={{ display:"flex", gap:8 }}>
-          <button onClick={() => navigate(-1)} className="secondary">← Retour</button>
+          <button 
+            onClick={() => navigate("/dashboard", { state: { activeTab: "Entrainement" } })} 
+            className="secondary" 
+            style={{ padding: '8px 12px', color: '#fff', borderRadius: '8px', border: '1px solid #ccc', cursor: 'pointer' }}
+          >
+            ← Retour
+          </button>
           <button onClick={() => window.print()}>Imprimer</button>
         </div>
       </div>
