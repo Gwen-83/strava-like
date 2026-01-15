@@ -4,7 +4,6 @@ import { doc, getDoc } from "firebase/firestore"
 import { db } from "../firebase"
 import type { ActivityDetails } from "../types/Activity"
 import { reverseGeocode } from "../services/geocoding"
-import exportImage from "../services/exportImage"
 
 function ActivityPage() {
   const { id } = useParams<{ id: string }>()
@@ -337,7 +336,6 @@ function ActivityPage() {
       const valid = requested.filter(r => FIELD_OPTIONS[r])
       const fields = valid.length > 0 ? valid : undefined
       const themeChoice = (window.prompt("Thème: light / dark", "light") || "light").trim().toLowerCase()
-      await exportImage(activity, { theme: themeChoice === "dark" ? "dark" : "light", fields })
     } else if (choice === "json") {
       exportJSON(activity)
     } else {

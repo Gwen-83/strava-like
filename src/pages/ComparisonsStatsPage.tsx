@@ -1,38 +1,8 @@
 import { useState } from "react"
 import type { ActivitySummary } from "../types/Activity"
 import { comparePeriods, filterByPeriod } from "../utils/comparisons"
+import { calculateActivityStats } from "../utils/activityAnalytics"
 import "../styles/comparisons.css"
-
-function calculateStats(activities: ActivitySummary[]) {
-  const validActivities = activities.filter(a => !a.isSuspicious)
-
-  const totalDistance = validActivities.reduce(
-    (sum, a) => sum + (Number.isFinite(a.distance_m) ? a.distance_m : 0),
-    0
-  )
-
-  const totalDuration = validActivities.reduce(
-    (sum, a) => sum + (Number.isFinite(a.duration_s) ? a.duration_s : 0),
-    0
-  )
-
-  const averageSpeed = totalDuration ? totalDistance / totalDuration : NaN
-
-  const elevationValues = validActivities
-    .map(a => (Number.isFinite(a.elevation_m as any) ? a.elevation_m as number : NaN))
-    .filter(v => Number.isFinite(v))
-
-  const totalElevation = elevationValues.length
-    ? elevationValues.reduce((s, v) => s + v, 0)
-    : NaN
-
-  return {
-    totalDistance,
-    averageSpeed,
-    totalElevation,
-    hasElevation: elevationValues.length > 0,
-  }
-}
 
 function fmtRangeLabel(start?: Date, end?: Date) {
   if (!start || !end) return ""
@@ -54,7 +24,7 @@ export default function ComparisonsStatsPage({ activities }: { activities: Activ
     ? filterByPeriod(filteredActivities, periodType, new Date(baseDate), 0).activities
     : filteredActivities
 
-  const filteredStats = calculateStats(statsActivities)
+  const filteredStats = calculateActivityStats(statsActivities)
 
   const comparison = comparePeriods(filteredActivities, periodType, new Date(baseDate));
   const currentRange = comparison.currentRange

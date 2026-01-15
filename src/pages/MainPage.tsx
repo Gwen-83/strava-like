@@ -2,6 +2,10 @@ import { useMemo, useState } from "react"
 import { useUser } from "../contexts/UserContext"
 import type { ActivitySummary } from "../types/Activity"
 import { predictPerformance } from "../utils/guess"
+import {
+  computeRefSpeeds,
+  calculateActivityTrainingLoad,
+} from "../utils/activityAnalytics"
 import "../styles/main.css"
 
 function formatDuration(s: number) {
@@ -24,72 +28,6 @@ function dayKey(d: Date) {
   const x = startOfDay(new Date(d))
   return x.toISOString().slice(0, 10)
 }
-
-// --- ADD: constants / helpers to compute training load (copié et adapté depuis ChartsPage) ---
-const DEFAULT_REF_SPEEDS: Record<string, number> = { Marche: 5, Cyclisme: 25, Course: 10, Randonnée: 4 }
-const K_GRADE = 0.005
-const N_EXP_BY_SPORT: Record<string, number> = {
-  Marche: 1.8,
-  Course: 2.6,
-  Cyclisme: 2.4,
-  Randonnée: 2.2,
-}
-const DEFAULT_N_EXP = 2.5
-const VAR_ALPHA = 0.5
-
-function median(values: number[]) {
-  if (!values.length) return NaN
-  const s = values.slice().sort((a, b) => a - b)
-  const mid = Math.floor(s.length / 2)
-  return s.length % 2 === 1 ? s[mid] : (s[mid - 1] + s[mid]) / 2
-}
-
-// compute per-sport reference speeds from the activities (durations > 1800s, distance>0)
-function computeRefSpeeds(activities: ActivitySummary[]) {
-  const SPORTS = Object.keys(DEFAULT_REF_SPEEDS)
-  return SPORTS.reduce((acc, sp) => {
-    const speeds = activities
-      .filter((a) => a.sport === sp && Number(a.duration_s) > 1800 && Number(a.distance_m) > 0)
-      .map((a) => (Number(a.distance_m) / Number(a.duration_s)) * 3.6)
-    const m = median(speeds)
-    acc[sp] = Number.isFinite(m) ? m : DEFAULT_REF_SPEEDS[sp]
-    return acc
-  }, {} as Record<string, number>)
-}
-
-function trainingLoadFn(a: ActivitySummary, refSpeeds: Record<string, number>) {
-  const durS = Number(a.duration_s)
-  if (!Number.isFinite(durS) || durS <= 0) return 0
-  const durationHours = durS / 3600
-  const distM = Number(a.distance_m)
-  const speedKmh = Number.isFinite(distM) && durS > 0 ? (distM / durS) * 3.6 : NaN
-  const elev = Number(a.elevation_m) || 0
-  const distKm = distM > 0 ? distM / 1000 : NaN
-  const rawGrade = Number.isFinite(distKm) && distKm > 0 ? elev / distKm : NaN
-  const gradeFactor = Number.isFinite(rawGrade) ? 1 + K_GRADE * Math.min(rawGrade, 150) : 1
-  const adjSpeed = Number.isFinite(speedKmh) ? speedKmh * gradeFactor : NaN
-  const sport = a.sport || "Autre"
-  const ref = sport in refSpeeds ? refSpeeds[sport] : NaN
-
-  let actLoad = 0
-  if (Number.isFinite(adjSpeed) && Number.isFinite(ref) && ref > 0) {
-    const ratio = adjSpeed / ref
-    const nExp = sport in N_EXP_BY_SPORT ? N_EXP_BY_SPORT[sport] : DEFAULT_N_EXP
-    actLoad = 100 * durationHours * Math.pow(ratio, nExp)
-  } else {
-    actLoad = 0
-  }
-
-  const variability =
-    Number.isFinite(Number(a.max_speed_ms) * 3.6) && Number.isFinite(speedKmh) && speedKmh > 0
-      ? Number(a.max_speed_ms) * 3.6 / speedKmh
-      : 1
-  const variabilityFactor = 1 + VAR_ALPHA * Math.max(0, variability - 1)
-  actLoad *= variabilityFactor
-
-  return Number.isFinite(actLoad) ? actLoad : 0
-}
-// --- END ADD ---
 
 export default function MainPage({
   activities,
@@ -134,10 +72,10 @@ export default function MainPage({
     const elev30 = sum(in30, (a) => a.elevation_m ?? 0)
     const time30s = sum(in30, (a) => a.duration_s ?? 0)
 
-    // Use trainingLoadFn when computing loads to match ChartsPage values
-    const load30 = sum(in30, (a) => trainingLoadFn(a, REF_SPEEDS_KMH))
-    const load7 = sum(in7, (a) => trainingLoadFn(a, REF_SPEEDS_KMH))
-    const load28 = sum(in28, (a) => trainingLoadFn(a, REF_SPEEDS_KMH))
+    // Use calculateActivityTrainingLoad for consistent load calculation across pages
+    const load30 = sum(in30, (a) => calculateActivityTrainingLoad(a, REF_SPEEDS_KMH))
+    const load7 = sum(in7, (a) => calculateActivityTrainingLoad(a, REF_SPEEDS_KMH))
+    const load28 = sum(in28, (a) => calculateActivityTrainingLoad(a, REF_SPEEDS_KMH))
 
     // variation over 30 days: compare latter half (last 15 days) vs first half (previous 15 days)
     const half = 15
@@ -151,8 +89,8 @@ export default function MainPage({
       const d = startOfDay(new Date(a.startDate))
       return d >= mid && d <= startOfDay(now)
     })
-    const loadFirst = sum(firstHalf, (a) => trainingLoadFn(a, REF_SPEEDS_KMH))
-    const loadSecond = sum(secondHalf, (a) => trainingLoadFn(a, REF_SPEEDS_KMH))
+    const loadFirst = sum(firstHalf, (a) => calculateActivityTrainingLoad(a, REF_SPEEDS_KMH))
+    const loadSecond = sum(secondHalf, (a) => calculateActivityTrainingLoad(a, REF_SPEEDS_KMH))
     const variation30Pct =
       loadFirst === 0 ? (loadSecond === 0 ? 0 : 100) : ((loadSecond - loadFirst) / Math.abs(loadFirst)) * 100
 
@@ -212,12 +150,12 @@ export default function MainPage({
     const now = startOfDay(new Date())
     const dayMs = 24 * 60 * 60 * 1000
 
-    // build daily loads map (sum of trainingLoadFn per day)
+    // build daily loads map (sum of calculateActivityTrainingLoad per day)
     const dailyLoads = new Map<string, number>()
     activities.forEach((a) => {
       const key = dayKey(new Date(a.startDate))
       const prev = dailyLoads.get(key) ?? 0
-      dailyLoads.set(key, prev + trainingLoadFn(a, REF_SPEEDS_KMH))
+      dailyLoads.set(key, prev + calculateActivityTrainingLoad(a, REF_SPEEDS_KMH))
     })
 
     // helper to get sum array for 7-day window ending at offset days before today
@@ -553,78 +491,88 @@ export default function MainPage({
           </div>
         </div>
 
-        {/* Predictions panel (avant la partie Objectifs) */}
-        <div style={{ width: 300, border: "1px solid #eee", padding: 10, borderRadius: 6, marginRight: 12 }}>
-          <h3>Prédictions</h3>
-          {performance.running ? (
-            <div style={{ marginBottom: 10 }}>
-              <strong>Course</strong>
-              <div style={{ fontSize: 13 }}>
-                <div>5 km: {formatDuration((performance.running as Record<string, number>)["5km"])}</div>
-                <div>10 km: {formatDuration((performance.running as Record<string, number>)["10km"])}</div>
-                <div>21.1 km: {formatDuration((performance.running as Record<string, number>)["21.1km"])}</div>
-                <div>Marathon: {formatDuration((performance.running as Record<string, number>)["42.2km"])}</div>
+        {/* Predictions and Objectives panel - stacked vertically */}
+        <div style={{ display: "flex", flexDirection: "column", width: 300, gap: 24 }}>
+          {/* Objectives panel */}
+          <aside>
+            <h3>Objectifs</h3>
+            {objectives && objectives.length > 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {objectives.map((o) => {
+                  const actual = sumActivitiesForObjective(o)
+                  const target = Number(o.value) || 0
+                  const pct = target > 0 ? Math.round((actual / target) * 100) : 0
+                  const clampedPct = Math.max(0, Math.min(100, pct))
+                  const elapsed = elapsedFraction(o)
+                  const expectedSoFar = target * elapsed
+                  const behind = o.kind !== "totalHours" && actual < expectedSoFar - 1e-6
+                  const label =
+                    o.kind === "sessions" ? `${actual}/${target} séances` :
+                    o.kind === "hours" || o.kind === "totalHours" ? `${actual.toFixed(1)}h / ${target}h` :
+                    o.kind === "distance" ? `${actual.toFixed(1)} ${o.unit || "km"} / ${target} ${o.unit || "km"}` :
+                    o.kind === "elevation" ? `${actual.toFixed(0)} ${o.unit || "m"} / ${target} ${o.unit || "m"}` :
+                    ""
+                  return (
+                    <div key={o.id} style={{ border: "1px solid #eee", padding: 10, borderRadius: 6 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div style={{ fontSize: 14, fontWeight: 600 }}>{label}</div>
+                        {o.sport ? <div style={{ fontSize: 12, color: "#666" }}>{o.sport}</div> : null}
+                      </div>
+                      <div style={{ height: 8, background: "#f0f0f0", borderRadius: 6, marginTop: 8, overflow: "hidden" }}>
+                        <div style={{ width: `${clampedPct}%`, height: "100%", background: "#1976d2" }} />
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: 12 }}>
+                        <div>{clampedPct}%</div>
+                        <div style={{ color: behind ? "#d9534f" : "#2e7d32" }}>{o.kind === "totalHours" ? "" : (behind ? "En retard" : "On track")}</div>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
-              <div style={{ fontSize: 12, color: "#666" }}>Confiance: {performance.confidence.running}</div>
-            </div>
-          ) : (
-            <div className="small-muted">Pas assez de données pour prédictions course.</div>
-          )}
+            ) : (
+              <div className="small-muted">Aucun objectif défini.</div>
+            )}
+          </aside>
 
-          {performance.cycling ? (
-            <div>
-              <strong>Cyclisme</strong>
-              <div style={{ fontSize: 13 }}>
-                <div>FTP estimé: {Math.round(performance.cycling.ftp)}</div>
-                <div>P20 estimée: {Math.round(performance.cycling.p20)}</div>
+          {/* Predictions panel */}
+          <div style={{ border: "1px solid #eee", padding: 10, borderRadius: 6 }}>
+            <h3>Prédictions</h3>
+            
+            {/* Course */}
+            {performance.running ? (
+              <div style={{ marginBottom: 15, paddingBottom: 12, borderBottom: "1px solid #f0f0f0" }}>
+                <strong>Course à pied</strong>
+                <div style={{ fontSize: 13 }}>
+                  <div>5 km: {formatDuration((performance.running as Record<string, number>)["5km"])}</div>
+                  <div>10 km: {formatDuration((performance.running as Record<string, number>)["10km"])}</div>
+                  <div>21.1 km: {formatDuration((performance.running as Record<string, number>)["21.1km"])}</div>
+                  <div>Marathon: {formatDuration((performance.running as Record<string, number>)["42.2km"])}</div>
+                </div>
+                <div style={{ fontSize: 12, color: "#666" }}>Confiance: {performance.confidence.running}</div>
               </div>
-              <div style={{ fontSize: 12, color: "#666" }}>Confiance: {performance.confidence.cycling}</div>
-            </div>
-          ) : (
-            <div className="small-muted">Pas assez de données pour prédictions cyclisme.</div>
-          )}
-        </div>
+            ) : (
+              <div className="small-muted">Pas assez de données pour prédictions course.</div>
+            )}
 
-        {/* Objectives panel */}
-        <aside style={{ width: 300 }}>
-          <h3>Objectifs</h3>
-          {objectives && objectives.length > 0 ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {objectives.map((o) => {
-                const actual = sumActivitiesForObjective(o)
-                const target = Number(o.value) || 0
-                const pct = target > 0 ? Math.round((actual / target) * 100) : 0
-                const clampedPct = Math.max(0, Math.min(100, pct))
-                const elapsed = elapsedFraction(o)
-                const expectedSoFar = target * elapsed
-                const behind = o.kind !== "totalHours" && actual < expectedSoFar - 1e-6
-                const label =
-                  o.kind === "sessions" ? `${actual}/${target} séances` :
-                  o.kind === "hours" || o.kind === "totalHours" ? `${actual.toFixed(1)}h / ${target}h` :
-                  o.kind === "distance" ? `${actual.toFixed(1)} ${o.unit || "km"} / ${target} ${o.unit || "km"}` :
-                  o.kind === "elevation" ? `${actual.toFixed(0)} ${o.unit || "m"} / ${target} ${o.unit || "m"}` :
-                  ""
-                return (
-                  <div key={o.id} style={{ border: "1px solid #eee", padding: 10, borderRadius: 6 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <div style={{ fontSize: 14, fontWeight: 600 }}>{label}</div>
-                      {o.sport ? <div style={{ fontSize: 12, color: "#666" }}>{o.sport}</div> : null}
-                    </div>
-                    <div style={{ height: 8, background: "#f0f0f0", borderRadius: 6, marginTop: 8, overflow: "hidden" }}>
-                      <div style={{ width: `${clampedPct}%`, height: "100%", background: "#1976d2" }} />
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: 12 }}>
-                      <div>{clampedPct}%</div>
-                      <div style={{ color: behind ? "#d9534f" : "#2e7d32" }}>{o.kind === "totalHours" ? "" : (behind ? "En retard" : "On track")}</div>
-                    </div>
+            {/* Cyclisme */}
+            {performance.cycling ? (
+              <div style={{ marginTop: 10 }}>
+                <strong>Cyclisme</strong>
+                <div style={{ fontSize: 13 }}>
+                  <div>FTP estimé: <span style={{ fontWeight: 600 }}>{(performance.cycling as any).ftp} W</span></div>
+                  <div style={{ fontSize: 12, color: "#666" }}>
+                    ({(performance.cycling as any).ftp_wkg} W/kg)
+                    (Incertitude : {(performance.cycling as any).ftp_uncertainty} %)
                   </div>
-                )
-              })}
-            </div>
-          ) : (
-            <div className="small-muted">Aucun objectif défini.</div>
-          )}
-        </aside>
+                  <div style={{ marginTop: 6 }}>Puissance 20 min: <span style={{ fontWeight: 600 }}>{(performance.cycling as any).power20min} W</span></div>
+                </div>
+                <div style={{ fontSize: 12, color: "#666", marginTop: 8 }}>Confiance: {performance.confidence.cycling}</div>
+              </div>
+            ) : (
+              <div className="small-muted" style={{ marginTop: 10 }}>Pas assez de données pour prédictions cyclisme.</div>
+            )}
+          </div>
+        </div>
       </div>
     </section>
   )

@@ -59,8 +59,8 @@ export function mapStravaToDetails(
     max_speed_ms: raw.max_speed ?? undefined,
     avg_watts: raw.average_watts ?? undefined,
     energy_kj: raw.kilojoules ?? undefined,
-    avg_hrt: raw.average_heartrate ?? undefined,
-    max_hrt: raw.max_heartrate ?? undefined,
+    avg_hrt: raw.average_heartrate ?? 0,
+    max_hrt: raw.max_heartrate ?? 0,
 
     has_gps: !!raw.map?.summary_polyline,
     has_streams: false,

@@ -1,6 +1,10 @@
 import type { ActivitySummary } from "../types/Activity"
 import { useState, useEffect } from "react";
 import { XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, ResponsiveContainer, AreaChart, Area, Legend } from "recharts";
+import {
+  computeRefSpeeds,
+  calculateActivityTrainingLoad,
+} from "../utils/activityAnalytics";
 import "../styles/charts.css";
 
 export default function ChartsPage({ activities }: { activities: ActivitySummary[] }) {
@@ -185,74 +189,11 @@ export default function ChartsPage({ activities }: { activities: ActivitySummary
   const kmFn = (a: ActivitySummary) => (a.distance_m || 0) / 1000;
   const elevationFn = (a: ActivitySummary) => a.elevation_m || 0;
 
-  // helper median
-  function median(values: number[]) {
-    if (!values.length) return NaN;
-    const s = values.slice().sort((a,b) => a - b);
-    const mid = Math.floor(s.length / 2);
-    return s.length % 2 === 1 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
-  }
+  // compute reference speeds (km/h) per sport from activities
+  const REF_SPEEDS_KMH = computeRefSpeeds(activities);
 
-  // compute reference speeds (km/h) per sport from activities (use durations > 5400s)
-  const DEFAULT_REF_SPEEDS: Record<string, number> = { Marche: 5, Cyclisme: 25, Course: 10, Randonnée: 4 };
-  const SPORTS = Object.keys(DEFAULT_REF_SPEEDS);
-  const REF_SPEEDS_KMH: Record<string, number> = SPORTS.reduce((acc, sp) => {
-    const speeds = activities
-      .filter(a => a.sport === sp && Number(a.duration_s) > 1800 && Number(a.distance_m) > 0)
-      .map(a => (Number(a.distance_m) / Number(a.duration_s)) * 3.6);
-    const m = median(speeds);
-    acc[sp] = Number.isFinite(m) ? m : DEFAULT_REF_SPEEDS[sp];
-    return acc;
-  }, {} as Record<string, number>);
-
-  const K_GRADE = 0.005; // k for grade factor
-  const N_EXP_BY_SPORT: Record<string, number> = {
-    Marche: 1.8,
-    Course: 2.6,
-    Cyclisme: 2.4,
-    Randonnée: 2.2,
-  };
-  const DEFAULT_N_EXP = 2.5;
-  const VAR_ALPHA = 0.5; // variability weighting
-
-  // remplacé : fonction qui calcule la charge pour une activité (avec ajustement pour le dénivelé et exposants par sport)
-  const trainingLoadFn = (a: ActivitySummary) => {
-    const durS = Number(a.duration_s);
-    if (!Number.isFinite(durS) || durS <= 0) return 0;
-    const durationHours = durS / 3600;
-
-    const distM = Number(a.distance_m);
-    const speedKmh = Number.isFinite(distM) && durS > 0 ? (distM / durS) * 3.6 : NaN;
-
-    // gradeFactor using elevation (guard distance)
-    const elev = Number(a.elevation_m) || 0;
-    const distKm = distM > 0 ? distM / 1000 : NaN;
-    // rawGrade in m/km, cap at 150
-    const rawGrade = Number.isFinite(distKm) && distKm > 0 ? elev / distKm : NaN;
-    const gradeFactor = Number.isFinite(rawGrade) ? 1 + K_GRADE * Math.min(rawGrade, 150) : 1;
-    const adjSpeed = Number.isFinite(speedKmh) ? speedKmh * gradeFactor : NaN;
-
-    const sport = a.sport || "Autre";
-    const ref = sport in REF_SPEEDS_KMH ? REF_SPEEDS_KMH[sport] : NaN;
-
-    let actLoad = 0;
-    if (Number.isFinite(adjSpeed) && Number.isFinite(ref) && ref > 0) {
-      const ratio = adjSpeed / ref;
-      const nExp = sport in N_EXP_BY_SPORT ? N_EXP_BY_SPORT[sport] : DEFAULT_N_EXP;
-      actLoad = 100 * durationHours * Math.pow(ratio, nExp);
-    } else {
-      actLoad = 0;
-    }
-
-    // variability factor based on reported max speed (fallback 1)
-    const variability = Number.isFinite(Number(a.max_speed_ms)*3.6) && Number.isFinite(speedKmh) && speedKmh > 0
-      ? Number(a.max_speed_ms)*3.6 / speedKmh
-      : 1;
-    const variabilityFactor = 1 + VAR_ALPHA * Math.max(0, variability - 1);
-    actLoad *= variabilityFactor;
-
-    return Number.isFinite(actLoad) ? actLoad : 0;
-  };
+  // training load function using centralized algorithm
+  const trainingLoadFn = (a: ActivitySummary) => calculateActivityTrainingLoad(a, REF_SPEEDS_KMH);
   
   // keyFn/day helper for daily buckets
   const keyFnDay = (d: Date) => d.toISOString().slice(0,10);
