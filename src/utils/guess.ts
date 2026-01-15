@@ -251,18 +251,51 @@ function predictRunningTimes(
   return res;
 }
 
-function extractPowerEfforts(acts: ActivitySummary[]) {
+function extractCyclingEfforts(acts: ActivitySummary[]) {
   return acts
-    .filter(a =>
-      a.avg_watts != null &&
-      Number.isFinite(a.avg_watts) &&
-      a.duration_s >= 12 * 60 &&
-      a.duration_s <= 60 * 60
-    )
-    .map(a => ({
-      t: a.duration_s,
-      p: a.avg_watts!
-    }));
+    .map(a => {
+      if (!a.avg_watts || !a.duration_s) return null;
+      if (!a.avg_hrt || !a.max_hrt) return null;
+
+      const pEff = effectivePower(a);
+      if (!pEff) return null;
+
+      return {
+        t: a.duration_s,
+        p: pEff
+      };
+    })
+    .filter(Boolean) as { t: number; p: number }[];
+}
+
+function heartRateIntensityFactor(avgHR: number, maxHR: number) {
+  if (!avgHR || !maxHR) return 1;
+
+  const hri = avgHR / maxHR;
+
+  if (hri < 0.75) return 0.85;
+  if (hri < 0.80) return 0.95;
+  if (hri < 0.85) return 1.05;
+  if (hri < 0.90) return 1.15;
+  return 1.25;
+}
+
+function durationFactor(durationS: number) {
+  if (durationS < 20 * 60) return 0.95;
+  return 1 + 0.1 * Math.log(durationS / (20 * 60));
+}
+
+function effectivePower(a: ActivitySummary) {
+  if (!a.avg_watts) return null;
+
+  const hrFactor = heartRateIntensityFactor(
+    a.avg_hrt ?? 0,
+    a.max_hrt ?? 0
+  );
+
+  const durFactor = durationFactor(a.duration_s);
+
+  return a.avg_watts * hrFactor * durFactor;
 }
 
 function estimateCP(efforts: { t: number; p: number }[]) {
@@ -306,7 +339,18 @@ function computeFormDelta(
   return clamp((ctl - atl) / ctl, -0.05, 0.05);
 }
 
-export function predictPerformance(activities: ActivitySummary[], ctl: number, atl: number) {
+function estimateFTPFromEfforts(efforts: { p: number }[]) {
+  if (efforts.length === 0) return null;
+
+  const ps = efforts.map(e => e.p).sort((a, b) => a - b);
+  return ps[Math.floor(ps.length * 0.65)];
+}
+
+export function predictPerformance(
+  activities: ActivitySummary[],
+  ctl: number,
+  atl: number
+) {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - 42);
 
@@ -314,25 +358,40 @@ export function predictPerformance(activities: ActivitySummary[], ctl: number, a
     a => new Date(a.startDate) >= cutoff
   );
 
+  console.log(`[predictPerformance] Total activities: ${activities.length}, recent (42j): ${recent.length}`);
+
   const formDelta = computeFormDelta(ctl, atl);
 
-  // COURSE
+  /* =========================
+     COURSE
+     ========================= */
+
   const runActs = recent.filter(a => a.sport === "Course");
   let refRun = selectBestRunningEffort(runActs);
 
-  // fallback: if no "flat" effort (>=3km) found, pick the best available run (any distance)
+  // fallback : meilleure perf brute si pas de normalisation dénivelé
   if (!refRun && runActs.length > 0) {
     const scoredAny = runActs
       .map(a => {
         const dKm = (a.distance_m || 0) / 1000;
         if (!dKm || !a.duration_s) return null;
         const v = dKm / (a.duration_s / 3600);
-        return { distanceKm: dKm, timeS: a.duration_s, score: v * Math.sqrt(dKm) };
+        return {
+          distanceKm: dKm,
+          timeS: a.duration_s,
+          score: v * Math.sqrt(dKm)
+        };
       })
-      .filter(Boolean) as { distanceKm: number; timeS: number; score: number }[];
+      .filter(Boolean) as {
+        distanceKm: number;
+        timeS: number;
+        score: number;
+      }[];
 
     if (scoredAny.length > 0) {
-      refRun = scoredAny.reduce((best, cur) => (cur.score > best.score ? cur : best));
+      refRun = scoredAny.reduce((best, cur) =>
+        cur.score > best.score ? cur : best
+      );
     }
   }
 
@@ -344,36 +403,58 @@ export function predictPerformance(activities: ActivitySummary[], ctl: number, a
       )
     : null;
 
-  // CYCLISME
+  /* =========================
+     CYCLISME (modèle FC + durée)
+     ========================= */
+
   const bikeActs = recent.filter(a => a.sport === "Cyclisme");
-  const efforts = extractPowerEfforts(bikeActs);
-  const CP = estimateCP(efforts);
-  let cycling: { ftp: number; p20: number } | null = null;
-  let cpValue = CP;
+  console.log(`[predictPerformance] Bike acts in last 42 days: ${bikeActs.length}`);
+  console.log(`[predictPerformance] Bike acts details:`, bikeActs.map(a => ({
+    date: a.startDate,
+    sport: a.sport,
+    watts: a.avg_watts,
+    hrt: a.avg_hrt,
+    maxHrt: a.max_hrt,
+    duration: a.duration_s
+  })));
 
-  // fallback: if we have at least one effort, use its max power as a crude CP estimate
-  if (!cpValue && efforts.length === 1) {
-    cpValue = efforts[0].p;
-  }
+  // Efforts physiologiquement crédibles
+  const efforts = extractCyclingEfforts(bikeActs);
+  console.log(`[predictPerformance] Extracted efforts: ${efforts.length}`, efforts);
 
-  // fallback: if no filtered efforts but some bike activities contain avg_watts, try to use their avg
-  const watts = bikeActs
-    .filter(a => a.duration_s >= 15 * 60)
-    .map(a => a.avg_watts!)
+  // FTP robuste = quantile élevé des puissances effectives
+  const ftpValue = estimateFTPFromEfforts(efforts);
+  console.log(`[predictPerformance] FTP Value: ${ftpValue}`);
 
+  const cycling = ftpValue
+    ? {
+        ftp: ftpValue,
+        p20: ftpValue / 0.95
+      }
+    : null;
 
-  if (cpValue) {
-    cycling = predictCyclingPerformance(cpValue, formDelta);
-  } else {
-    cycling = null;
-  }
+  /* =========================
+     CONFIANCE
+     ========================= */
+
+  const cyclingConfidence =
+    efforts.length >= 6 ? "high"
+    : efforts.length >= 3 ? "medium"
+    : efforts.length >= 1 ? "low"
+    : bikeActs.length > 0 ? "low"
+    : "medium";
+
+  const runningConfidence =
+    runActs.length >= 6 ? "high"
+    : runActs.length > 0 ? "low"
+    : "medium";
 
   return {
     running,
     cycling,
     confidence: {
-      running: runActs.length >= 6 ? "high" : runActs.length > 0 ? "low" : "medium",
-      cycling: efforts.length >= 4 ? "high" : efforts.length >= 1 ? "low" : bikeActs.length >= 1 ? "low" : "medium"
+      running: runningConfidence,
+      cycling: cyclingConfidence
     }
   };
 }

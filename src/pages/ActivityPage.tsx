@@ -323,25 +323,6 @@ function ActivityPage() {
     ctx.closePath()
   }
 
-  const drawCard = (
-    ctx: CanvasRenderingContext2D,
-    x: number,
-    y: number,
-    w: number,
-    h: number,
-    r = 20,
-    bg = "#ffffff"
-  ) => {
-    ctx.save()
-    ctx.shadowColor = "rgba(0,0,0,0.15)"
-    ctx.shadowBlur = 20
-    ctx.shadowOffsetY = 10
-    ctx.fillStyle = bg
-    roundRect(ctx, x, y, w, h, r)
-    ctx.fill()
-    ctx.restore()
-  }
-
   // remplacement : handleExport demande ordre et transmet à exportImage
   const handleExport = async () => {
     if (!activity) return
