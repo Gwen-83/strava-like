@@ -6,6 +6,9 @@ import {
   computeRefSpeeds,
   calculateActivityTrainingLoad,
 } from "../utils/activityAnalytics"
+import { useBanisterModel } from "../hooks/useBanisterModel"
+import { getFormStatus } from "../utils/banisterModel"
+import type { Activity } from "../types/BanisterModel"
 import "../styles/main.css"
 
 function formatDuration(s: number) {
@@ -26,7 +29,11 @@ function startOfDay(d: Date) {
 
 function dayKey(d: Date) {
   const x = startOfDay(new Date(d))
-  return x.toISOString().slice(0, 10)
+  // Use local date, not UTC, to avoid timezone offset issues
+  const year = x.getFullYear()
+  const month = String(x.getMonth() + 1).padStart(2, '0')
+  const day = String(x.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 export default function MainPage({
@@ -146,93 +153,6 @@ export default function MainPage({
     }
     return { year, month, weeks }
   }, [today])
-
-  // --- ADD: analyse de régularité et évolution (périodes glissantes de 7 jours) ---
-  const trainingAnalysis = useMemo(() => {
-    const now = startOfDay(new Date())
-    const dayMs = 24 * 60 * 60 * 1000
-
-    // build daily loads map (sum of calculateActivityTrainingLoad per day)
-    const dailyLoads = new Map<string, number>()
-    activities.forEach((a) => {
-      const key = dayKey(new Date(a.startDate))
-      const prev = dailyLoads.get(key) ?? 0
-      dailyLoads.set(key, prev + calculateActivityTrainingLoad(a, REF_SPEEDS_KMH))
-    })
-
-    // helper to get sum array for 7-day window ending at offset days before today
-    function get7DayArray(endOffsetDays: number) {
-      const arr: number[] = []
-      for (let i = endOffsetDays + 6; i >= endOffsetDays; i--) {
-        const d = new Date(now.getTime() - i * dayMs)
-        const v = dailyLoads.get(dayKey(d)) ?? 0
-        arr.push(v)
-      }
-      return arr
-    }
-
-    // latest period (Vn): last 7 days including today
-    const last7 = get7DayArray(0)
-    const prev7 = get7DayArray(7)
-
-    const sumArr = (xs: number[]) => xs.reduce((s, x) => s + x, 0)
-    const Vn = sumArr(last7)
-    const Vn_1 = sumArr(prev7)
-
-    // delta (relative change) with safe handling when previous period is zero
-    const deltaPct = Vn_1 < 1e-6 ? (Vn === 0 ? 0 : 100) : ((Vn - Vn_1) / Vn_1) * 100
-    const delta = deltaPct / 100
-
-    // variability R = std / mean for last7 daily values
-    const mean = last7.length ? sumArr(last7) / last7.length : 0
-    const std = last7.length
-      ? Math.sqrt(last7.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / last7.length)
-      : 0
-    const R = mean > 0 ? std / mean : 0
-
-    // --- ADD: coherence index over the last 3 weeks (each week = 7-day block) ---
-    const weeklyTotals = [
-      sumArr(get7DayArray(0)),  // last 7 days
-      sumArr(get7DayArray(7)),  // previous 7 days
-      sumArr(get7DayArray(14)), // previous-previous 7 days
-    ]
-    const wkMean = weeklyTotals.reduce((s, x) => s + x, 0) / weeklyTotals.length
-    const wkStd =
-      weeklyTotals.length > 0
-        ? Math.sqrt(weeklyTotals.reduce((s, v) => s + Math.pow(v - wkMean, 2), 0) / weeklyTotals.length)
-        : 0
-    // C = 1 - (σ / μ), clamp to [0,1], map to 0..100. If mean ~ 0 -> score 0 (insufficient data)
-    let coherenceScore = 0
-    if (wkMean > 1e-6) {
-      const rawC = 1 - wkStd / wkMean
-      const clamped = Math.max(0, Math.min(1, rawC))
-      coherenceScore = Math.round(clamped * 100)
-    } else {
-      coherenceScore = 0
-    }
-    // --- END ADD ---
-
-    // decision logic (use both indicators as required)
-    let message: string | null = null
-    let kind: string | null = null
-
-    if (delta > 0.25 && R > 0.6) {
-      kind = "risk_overload"
-      message = `Risque de surcharge — Ton volume d'entraînement augmente fortement (+${Math.round(deltaPct)} %) et tes séances sont irrégulières.`
-    } else if (delta > 0.1 && delta <= 0.25 && R <= 0.6) {
-      kind = "rapid_increase"
-      message = `Hausse rapide — Ton volume progresse rapidement (+${Math.round(deltaPct)} %). Surveille la récupération.`
-    } else if (Math.abs(delta) <= 0.1 && R > 0.8) {
-      kind = "irregularity"
-      message = `Manque de régularité — Ton volume est stable, mais réparti de manière irrégulière.`
-    } else if (Math.abs(delta) <= 0.1 && R < 0.5) {
-      kind = "healthy"
-      message = `Zone saine — Ton entraînement est régulier et progresse de façon contrôlée.`
-    }
-
-    return { Vn, Vn_1, deltaPct, delta, R, message, kind, coherenceScore, weeklyTotals, wkMean, wkStd }
-  }, [activities, REF_SPEEDS_KMH, calendar.year, calendar.month])
-  // --- END ADD ---
 
   // --- ADD: monthly records computation ---
   const monthlyRecords = useMemo(() => {
@@ -398,80 +318,88 @@ export default function MainPage({
     return (now - start.getTime()) / (end.getTime() - start.getTime())
   }
 
+  // ============================================================================
+  // BANISTER TRAINING ADVICE
+  // ============================================================================
+  
+  // Prepare activities in Banister format
+  const banisterActivities = useMemo((): Activity[] => {
+    return activities.map((a) => ({
+      date: dayKey(new Date(a.startDate)),
+      trainingLoad: calculateActivityTrainingLoad(a, REF_SPEEDS_KMH),
+    }))
+  }, [activities, REF_SPEEDS_KMH])
+
+  // Get Banister model
+  const banisterData = useBanisterModel(banisterActivities)
+  const current = banisterData.currentPoint
+
+  // Get training advice based on TSB
+  const getTrainingAdvice = (tsb: number) => {
+    const formStatus = getFormStatus(tsb)
+
+    const zones: Record<string, { zone: string; icon: string; meaning: string; color: string }> = {
+      peaking: {
+        zone: "PEAKING",
+        icon: "🎯",
+        meaning: "Excellent état de forme ! C'est le moment de chercher des performances.",
+        color: "#4caf50",
+      },
+      balanced: {
+        zone: "BALANCED",
+        icon: "⚖️",
+        meaning: "État d'équilibre parfait. Continuez l'entraînement structuré.",
+        color: "#2196f3",
+      },
+      accumulating: {
+        zone: "ACCUMULATING",
+        icon: "📚",
+        meaning: "Phase de charge. Augmentez progressivement le volume.",
+        color: "#ff9800",
+      },
+      recovering: {
+        zone: "RECOVERING",
+        icon: "🏥",
+        meaning: "Phase de récupération. Réduisez le volume d'entraînement.",
+        color: "#ff9800",
+      },
+      overreaching: {
+        zone: "OVERREACHING",
+        icon: "🚨",
+        meaning: "Attention ! Vous êtes surmenés. Réduisez drastiquement.",
+        color: "#f44336",
+      },
+    }
+
+    return zones[formStatus] || zones.balanced
+  }
+
+  const advice = current ? getTrainingAdvice(current.TSB) : null
+
   return (
     <section style={{ display: "flex", gap: 24 }} className="section-mainPage">
       <div style={{ width: 260 }}>
-        {trainingAnalysis.message && (
-            <div
-              role="status"
-              aria-live="polite"
-              className={`training-advice ${trainingAnalysis.kind ?? ""}`}
-            >
-              <button
-                aria-label="Aide - analyse de régularité"
-                onClick={() => setHelpOpen(true)}
-                className="help-btn"
-                title="Qu'est-ce que c'est ?"
-              >
-                ?
-              </button>
-
-              <div style={{ fontWeight: 700, marginBottom: 6 }}>Conseil d'entraînement</div>
-              <div>{trainingAnalysis.message}</div>
-              <div style={{ marginTop: 8, fontSize: 12, color: "#444" }}>
-                <span>Variation (7j vs préc.): </span>
-                <span style={{ fontWeight: 600 }}>{Math.round(trainingAnalysis.deltaPct)}%</span>
-                <span style={{ marginLeft: 12 }}>Régularité (R): </span>
-                <span style={{ fontWeight: 600 }}>{trainingAnalysis.R.toFixed(2)}</span>
-                <span style={{ marginLeft: 12 }}>Indice cohérence (3 sem.): </span>
-                <span style={{ fontWeight: 600 }}>{trainingAnalysis.coherenceScore}/100</span>
-              </div>
-            </div>
-          )}
-          {helpOpen && (
-            <div
-              role="dialog"
-              aria-modal="true"
-              className="overlay-backdrop"
-               onClick={() => setHelpOpen(false)}
-            >
-              <div
-                role="document"
-                onClick={(e) => e.stopPropagation()}
-                className="advice-dialog"
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <h3 style={{ margin: 0 }}>Analyse de régularité de l’entraînement</h3>
-                  <button
-                    aria-label="Fermer l'aide"
-                    onClick={() => setHelpOpen(false)}
-                    className="dialog-close"
-                  >
-                    ✕
-                  </button>
+          {/* BANISTER TRAINING ADVICE */}
+          {current && advice && (
+            <div style={{ display: "grid", gap: 8, border: `2px solid ${advice.color}`, padding: 12, borderRadius: 8, background: `${advice.color}15` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 24 }}>{advice.icon}</span>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 16 }}>État de forme : {advice.zone}</div>
+                  <div style={{ fontSize: 14, color: "#ffffffdd" }}>{advice.meaning}</div>
                 </div>
-                <div style={{ marginTop: 12, lineHeight: 1.5, color: "#222", fontSize: 14 }}>
-                  <p><strong>À quoi sert cette analyse ?</strong></p>
-                  <p>Cette analyse permet d’évaluer comment ton entraînement évolue dans le temps et à quel point il est régulier. Elle aide à détecter une progression trop rapide, un manque de régularité ou au contraire une situation stable et saine, afin de mieux gérer la charge et la récupération.</p>
-
-                  <p><strong>Comment est-elle calculée ?</strong></p>
-                  <p>L’analyse repose sur une comparaison entre deux périodes glissantes de 7 jours : les 7 derniers jours et les 7 jours précédents. Deux indicateurs principaux sont calculés : évolution du volume (variation du volume total entre les deux périodes) et régularité (mesure de la dispersion de la charge jour par jour sur la dernière semaine).</p>
-
-                  <p><strong>Que signifient les indicateurs ?</strong></p>
-                  <p><em>Évolution du volume (%)</em> — Indique si ton volume d’entraînement augmente, diminue ou reste stable. Une hausse modérée est normale ; une hausse rapide peut indiquer un risque de surcharge.</p>
-                  <p><em>Régularité</em> — Mesure à quel point ton entraînement est bien réparti dans la semaine. Faible valeur : entraînement équilibré et régulier. Valeur élevée : séances très inégales (grosses séances isolées, jours sans entraînement).</p>
-                  <p><em>Indice de cohérence</em> - appelé C, est calculé sur les 3 dernières semaines (trois totaux hebdo) et transformé en score 0–100. Plus le score est élevé, plus la charge est stable (peu de trous/pics). proche de 100 → entraînement régulier d'une semaine à l'autre. Faible → grandes variations entre semaines (pics ou semaines creuses). Calculé comme 1-σ/μ, avec μ = (V1+V2+V3)/3, σ=racine(((V1-μ)²+(V2-μ)²+(V3-μ)²)/3) et Vi les volumes d'entrainements des semaines 1,2 et 3.</p>
-
-                  <p><strong>Comment interpréter les messages ?</strong></p>
-                  <p>Zone saine : progression contrôlée et entraînement bien réparti. Hausse rapide : volume en forte augmentation, récupération à surveiller. Manque de régularité : volume stable mais mal réparti. Risque de surcharge : augmentation importante associée à une forte irrégularité. Ces messages servent d’indicateurs, pas de verdicts.</p>
-
-                  <p><strong>Limites</strong></p>
-                  <p>Cette analyse se base uniquement sur la charge estimée des activités. Elle ne tient pas compte de la fatigue réelle, du sommeil, du stress ou des données physiologiques (fréquence cardiaque, puissance). Elle est surtout utile pour comparer les périodes entre elles et détecter des tendances.</p>
+              </div>
+              <div style={{ borderTop: `1px solid ${advice.color}80`, paddingTop: 8, marginTop: 8 }}>
+                <div style={{ fontSize: 12, color: "#ffffffb9", marginBottom: 4 }}>
+                  <strong>CTL (Fitness):</strong> {current.CTL.toFixed(1)} | 
+                  <strong style={{ marginLeft: 12 }}>ATL (Fatigue):</strong> {current.ATL.toFixed(1)} | 
+                  <strong style={{ marginLeft: 12 }}>TSB (État):</strong> {current.TSB.toFixed(1)}
                 </div>
               </div>
             </div>
           )}
           <br></br>
+
         <div style={{ display: "grid", gap: 8, border: "1px solid #eee", padding: 12, borderRadius: 8 }}>
           <h3>Résumé (30 derniers jours)</h3>
           <div>

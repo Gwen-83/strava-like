@@ -365,7 +365,7 @@ function ActivityPage() {
                 {activity.avg_speed_ms != null && (
                   <div>
                     <div className="small">Vitesse moyenne</div>
-                    <strong>{(activity.avg_speed_ms*3.6).toFixed(1)} km/h</strong>
+                    <strong>{(activity.avg_speed_ms*3.6).toFixed(2)} km/h</strong>
                   </div>
                 )}
                 {activity.avg_watts != null && (

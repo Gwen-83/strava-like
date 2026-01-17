@@ -237,10 +237,10 @@ export function FileImportDialog({ onImportSuccess, userId }: FileImportProps) {
                     }}
                   >
                     <p style={{ margin: "0 0 4px 0" }}>
-                      <strong>Distance:</strong> {(parsedActivity.distance_m / 1000).toFixed(1)} km
+                      <strong>Distance:</strong> {(parsedActivity.distance_m / 1000).toFixed(2)} km
                     </p>
                     <p style={{ margin: "0 0 4px 0" }}>
-                      <strong>Durée:</strong> {(parsedActivity.duration_s / 60).toFixed(1)} min
+                      <strong>Durée:</strong> {(parsedActivity.duration_s / 60).toFixed(2)} min
                     </p>
                     <p style={{ margin: "0" }}>
                       <strong>Sport détecté:</strong> {parsedActivity.sport}

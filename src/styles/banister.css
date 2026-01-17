@@ -1,0 +1,9 @@
+/* Banister page layout */
+.banister-page {
+  padding: 20px;
+  color: var(--text-color, #fff);
+  font-family: inherit;
+  grid-column: 1 / -1;
+  max-width: 1200px;
+  margin: 0 auto;
+}

@@ -8,6 +8,7 @@ import { useEffect, useState, useRef } from "react"
 import MainPage from "./MainPage";
 import ChartsPage from "./ChartsPage";
 import ComparisonsStatsPage from "./ComparisonsStatsPage";
+import BanisterPage from "./BanisterPage";
 import ActivitiesPage from "./ActivitiesPage";
 import ProfilePage from "./ProfilePage";
 import { useUser } from "../contexts/UserContext";
@@ -32,12 +33,10 @@ function Dashboard() {
 
   // refs for dropdowns to detect outside clicks on mobile
   const analyseRef = useRef<HTMLDivElement | null>(null);
-  const entrainRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
       if (!isMobile) return;
       if (analyseRef.current && !analyseRef.current.contains(e.target as Node)) setShowAnalyseMenu(false);
-      if (entrainRef.current && !entrainRef.current.contains(e.target as Node)) setShowEntrainementMenu(false);
     }
     document.addEventListener("click", onDocClick);
     return () => document.removeEventListener("click", onDocClick);
@@ -50,9 +49,8 @@ function Dashboard() {
   const [activeTab, setActiveTab] = useState<"Accueil" | "Analyse" | "Entrainement" | "Profil">(
     (location.state?.activeTab as any) || "Accueil"
   );
-  const [analysisSubTab, setAnalysisSubTab] = useState<"Graphiques" | "Stats">("Graphiques")
+  const [analysisSubTab, setAnalysisSubTab] = useState<"Graphiques" | "Stats" | "Banister">("Graphiques")
   const [showAnalyseMenu, setShowAnalyseMenu] = useState(false)
-  const [showEntrainementMenu, setShowEntrainementMenu] = useState(false)
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -156,7 +154,7 @@ function Dashboard() {
               className="tab-dropdown-toggle tab-button" 
               role="tab" 
               aria-selected={activeTab === "Accueil"} 
-              onClick={() => { setActiveTab("Accueil"); setShowAnalyseMenu(false); setShowEntrainementMenu(false); }}
+              onClick={() => { setActiveTab("Accueil"); setShowAnalyseMenu(false); }}
             >
               Accueil
             </button>
@@ -182,40 +180,26 @@ function Dashboard() {
                  <div className="tab-dropdown-menu" role="menu">
                   <button role="menuitem" onClick={() => { setAnalysisSubTab("Graphiques"); setActiveTab("Analyse"); setShowAnalyseMenu(false); }}>Graphiques</button>
                   <button role="menuitem" onClick={() => { setAnalysisSubTab("Stats"); setActiveTab("Analyse"); setShowAnalyseMenu(false); }}>Comparaisons & Stats</button>
+                  <button role="menuitem" onClick={() => { setAnalysisSubTab("Banister"); setActiveTab("Analyse"); setShowAnalyseMenu(false); }}>Banister</button>
                  </div>
                )}
              </div>
  
              {/* Entrainement dropdown (pour l'instant un seul item) */}
-             <div
-              className="tab-dropdown"
-              ref={entrainRef}
-              onMouseEnter={() => !isMobile && setShowEntrainementMenu(true)}
-              onMouseLeave={() => !isMobile && setShowEntrainementMenu(false)}
-              style={{ display: "inline-block", position: "relative", marginRight: 12 }}
+             <button
+              className="tab-dropdown-toggle tab-button" 
+              role="tab"
+              aria-selected={activeTab === "Entrainement"} 
+              onClick={() => { setActiveTab("Entrainement"); setShowAnalyseMenu(false); }}
             >
-              <button
-                className="tab-dropdown-toggle"
-                role="button"
-                aria-haspopup="menu"
-                aria-expanded={showEntrainementMenu}
-                aria-selected={activeTab === "Entrainement"}
-                onClick={() => { if (isMobile) setShowEntrainementMenu(s => !s); else setShowEntrainementMenu(true); }}
-              >
-                Entrainement ▾
-              </button>
-              {showEntrainementMenu && (
-                <div className="tab-dropdown-menu" role="menu">
-                  <button role="menuitem" onClick={() => { setActiveTab("Entrainement"); setShowEntrainementMenu(false); }}>Activités</button>
-                </div>
-              )}
-            </div>
+              Entrainement
+            </button>
 
             <button 
               className="tab-dropdown-toggle tab-button" 
               role="tab" 
               aria-selected={activeTab === "Profil"} 
-              onClick={() => { setActiveTab("Profil"); setShowAnalyseMenu(false); setShowEntrainementMenu(false); }}
+              onClick={() => { setActiveTab("Profil"); setShowAnalyseMenu(false); }}
             >
               Profil
             </button>
@@ -231,6 +215,9 @@ function Dashboard() {
           )}
           {activeTab === "Analyse" && analysisSubTab === "Stats" && (
             <ComparisonsStatsPage activities={activities} />
+          )}
+          {activeTab === "Analyse" && analysisSubTab === "Banister" && (
+            <BanisterPage activities={activities} />
           )}
           {activeTab === "Entrainement" && (
             <ActivitiesPage 
@@ -255,8 +242,8 @@ function Dashboard() {
  
                <p><strong>Type :</strong> {selected.sport}</p>
                <p><strong>Date :</strong> {selected.startDate.toLocaleString()}</p>
-               <p><strong>Distance :</strong> {(selected.distance_m / 1000).toFixed(1)} km</p>
-               <p><strong>Durée :</strong> {(selected.duration_s / 60).toFixed(1)} min</p>
+               <p><strong>Distance :</strong> {(selected.distance_m / 1000).toFixed(2)} km</p>
+               <p><strong>Durée :</strong> {(selected.duration_s / 60).toFixed(2)} min</p>
                <p><strong>D+ :</strong> {Number.isFinite(selected.elevation_m as any) ? `${selected.elevation_m} m` : "non mesuré"}</p>
                <p>
                 <button onClick={() => navigate(`/activity/${selected.id}`)}>

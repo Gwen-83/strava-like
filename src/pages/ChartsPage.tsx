@@ -248,6 +248,13 @@ export default function ChartsPage({ activities }: { activities: ActivitySummary
     }
   };
 
+  const tooltipValueFormatter = (value: any) => {
+    if (typeof value === "number") {
+      return Number.isFinite(value) ? value.toFixed(2) : "0.00";
+    }
+    return value;
+  };
+
   // simple color palette
   const colors = ["#60a5fa", "#f59e0b", "#34d399", "#fb7185", "#a78bfa", "#f97316"];
 
@@ -296,7 +303,7 @@ export default function ChartsPage({ activities }: { activities: ActivitySummary
                <CartesianGrid strokeDasharray="3 3" vertical={displayPeriod !== "week"} />
                <XAxis dataKey="key" tick={tickRenderer} height={isMobile ? 40 : 60} interval={0} />
                <YAxis />
-               <Tooltip labelFormatter={tooltipLabel} />
+               <Tooltip labelFormatter={tooltipLabel} formatter={tooltipValueFormatter} />
                <Legend verticalAlign="top" height={28} />
                {distanceStacked.sports.map((s, i) => (
                  <Bar key={s} dataKey={s} stackId="a" fill={colors[i % colors.length]} isAnimationActive={false} />
@@ -325,7 +332,7 @@ export default function ChartsPage({ activities }: { activities: ActivitySummary
                <CartesianGrid strokeDasharray="3 3" vertical={displayPeriod !== "week"} />
                <XAxis dataKey="key" tick={tickRenderer} height={isMobile ? 40 : 60} interval={0} />
                <YAxis />
-               <Tooltip labelFormatter={tooltipLabel} />
+               <Tooltip labelFormatter={tooltipLabel} formatter={tooltipValueFormatter} />
                <Legend verticalAlign="top" height={28} />
                {elevationStacked.sports.map((s, i) => (
                  <Bar key={s} dataKey={s} stackId="a" fill={colors[i % colors.length]} isAnimationActive={false} />
@@ -399,7 +406,7 @@ export default function ChartsPage({ activities }: { activities: ActivitySummary
                <CartesianGrid strokeDasharray="3 3" vertical={displayPeriod !== "week"} />
                <XAxis dataKey="key" tick={tickRenderer} height={isMobile ? 40 : 60} interval={0} />
                <YAxis />
-               <Tooltip labelFormatter={tooltipLabel} />
+               <Tooltip labelFormatter={tooltipLabel} formatter={tooltipValueFormatter} />
                <Area type="monotone" dataKey="value" stroke="#ffc658" fill="#fff1cc" strokeWidth={2} dot={false} activeDot={false} isAnimationActive={false} />
              </AreaChart>
            </ResponsiveContainer>

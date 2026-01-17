@@ -45,10 +45,6 @@ export function predictPerformance(
     (a) => new Date(a.startDate) >= cutoff
   )
 
-  console.log(
-    `[predictPerformance] Total: ${activities.length}, recent (42j): ${recent.length}`
-  )
-
   // Prédictions course à pied
   const runActs = recent.filter((a) => a.sport === "Course")
   const running = predictRunningPerformance(activities, ctl, atl)

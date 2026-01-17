@@ -142,12 +142,12 @@ export default function ComparisonsStatsPage({ activities }: { activities: Activ
           <div className="stats-grid">
             <div className="stat-card">
               <div className="stat-label">Distance</div>
-              <div className="stat-value">{(filteredStats.totalDistance / 1000).toFixed(1)} km</div>
+              <div className="stat-value">{(filteredStats.totalDistance / 1000).toFixed(2)} km</div>
             </div>
 
             <div className="stat-card">
               <div className="stat-label">Vitesse moy.</div>
-              <div className="stat-value">{(Number.isFinite(filteredStats.averageSpeed) ? (filteredStats.averageSpeed * 3.6).toFixed(1) : "0.0")} km/h</div>
+              <div className="stat-value">{(Number.isFinite(filteredStats.averageSpeed) ? (filteredStats.averageSpeed * 3.6).toFixed(2) : "0.00")} km/h</div>
             </div>
 
             <div className="stat-card">
@@ -166,11 +166,11 @@ export default function ComparisonsStatsPage({ activities }: { activities: Activ
           <div className="comparison-grid">
             <div className="comparison-card">
               <div className="card-label">Distance</div>
-              <div className="card-value">{(safe(comparison.current.distance) / 1000).toFixed(1)} km</div>
+              <div className="card-value">{(safe(comparison.current.distance) / 1000).toFixed(2)} km</div>
               <div className="card-meta">
-                <span className="meta-small">Précédent: {(safe(comparison.previous.distance) / 1000).toFixed(1)} km</span>
+                <span className="meta-small">Précédent: {(safe(comparison.previous.distance) / 1000).toFixed(2)} km</span>
                 <span className={"delta " + (delta(comparison.current.distance, comparison.previous.distance) >= 0 ? "pos" : "neg")}>
-                  {delta(comparison.current.distance, comparison.previous.distance).toFixed(1)} %
+                  {delta(comparison.current.distance, comparison.previous.distance).toFixed(2)} %
                 </span>
               </div>
             </div>
@@ -181,18 +181,18 @@ export default function ComparisonsStatsPage({ activities }: { activities: Activ
               <div className="card-meta">
                 <span className="meta-small">Précédent: {safe(comparison.previous.elevation).toFixed(0)} m</span>
                 <span className={"delta " + (delta(comparison.current.elevation, comparison.previous.elevation) >= 0 ? "pos" : "neg")}>
-                  {delta(comparison.current.elevation, comparison.previous.elevation).toFixed(1)} %
+                  {delta(comparison.current.elevation, comparison.previous.elevation).toFixed(2)} %
                 </span>
               </div>
             </div>
 
             <div className="comparison-card">
               <div className="card-label">Charge</div>
-              <div className="card-value">{safe(comparison.current.load).toFixed(1)}</div>
+              <div className="card-value">{safe(comparison.current.load).toFixed(2)}</div>
               <div className="card-meta">
-                <span className="meta-small">Précédent: {safe(comparison.previous.load).toFixed(1)}</span>
+                <span className="meta-small">Précédent: {safe(comparison.previous.load).toFixed(2)}</span>
                 <span className={"delta " + (delta(comparison.current.load, comparison.previous.load) >= 0 ? "pos" : "neg")}>
-                  {delta(comparison.current.load, comparison.previous.load).toFixed(1)} %
+                  {delta(comparison.current.load, comparison.previous.load).toFixed(2)} %
                 </span>
               </div>
             </div>

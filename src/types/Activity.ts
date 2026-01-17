@@ -1,5 +1,5 @@
 export type SportType = "Cyclisme" | "Course" | "Marche" | "Randonnée" | "Autre"
-export type ActivitySource = "strava" | "garmin" | "gpx" | "fit" | "manual"
+export type ActivitySource = "strava" | "garmin" | "gpx" | "fit" | "manual" | "fictitious"
 
 export type ActivitySummary = {
   id?: string
@@ -46,6 +46,13 @@ export type ActivityStream = {
   grade_pct?: number[]
 }
 
+export type ActivityPhoto = {
+  id: string
+  url: string
+  timestamp: Date
+  caption?: string
+}
+
 export interface ActivityDetails extends ActivitySummary {
   id:string
   // 🗺️ Données GPS / carte
@@ -55,4 +62,7 @@ export interface ActivityDetails extends ActivitySummary {
 
   // 📈 Streams détaillés
   streams?: Record<string, number[]> | null
+
+  // 📸 Photos associées
+  photos?: ActivityPhoto[] | null
 }
