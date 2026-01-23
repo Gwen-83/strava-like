@@ -104,13 +104,111 @@ function computeFormDelta(ctl: number, atl: number): number {
 }
 
 /**
- * Prédit les performances de course à pied
+ * Calcule la VMA (Vitesse Maximale Aérobie) en km/h
+ * VMA ≈ (distance / temps) × 3.6
+ * Basé sur le meilleur effort de course
+ */
+export function calculateVMA(ref: RunningEffort): number {
+  // ref.timeS est en secondes, ref.distanceKm est en km
+  // Vitesse en m/s = distanceKm * 1000 / timeS
+  // Vitesse en km/h = (distanceKm / (timeS / 3600)) = (distanceKm * 3600) / timeS
+  const speedKmh = (ref.distanceKm * 3600) / ref.timeS
+  
+  // VMA est généralement estimée comme la vitesse correspondant à VO2max
+  // Pour un effort de qualité (> 5km), on peut utiliser directement cette vitesse
+  // ou appliquer un facteur correctif selon la distance
+  // Pour les efforts longs (> 10km), la VMA est légèrement inférieure à la vitesse moyenne
+  // Facteur correctif : efforts longs favorisent les efforts en zone aérobie pure
+  const correctionFactor = ref.distanceKm > 10 ? 0.98 : 1.0
+  
+  return speedKmh * correctionFactor
+}
+
+/**
+ * Calcule l'incertitude de la VMA (en %)
+ * Basée sur :
+ * - La distance de l'effort (plus long = plus précis)
+ * - Le nombre d'efforts disponibles (plus d'efforts = plus précis)
+ */
+export function calculateVMAUncertainty(ref: RunningEffort, effortCount: number): number {
+  // Base: 15% d'incertitude
+  let uncertainty = 15
+
+  // Ajustement selon la distance : efforts plus longs sont plus fiables
+  // < 5km : +5%, 5-10km : 0%, > 10km : -3%
+  if (ref.distanceKm < 5) {
+    uncertainty += 5
+  } else if (ref.distanceKm > 10) {
+    uncertainty -= 3
+  }
+
+  // Ajustement selon le nombre d'efforts
+  // 1 effort: +8%, 2-3 efforts: +4%, 4-5 efforts: 0%, 6+ efforts: -3%
+  if (effortCount === 1) {
+    uncertainty += 8
+  } else if (effortCount === 2 || effortCount === 3) {
+    uncertainty += 4
+  } else if (effortCount >= 6) {
+    uncertainty -= 3
+  }
+
+  return Math.max(8, Math.min(25, uncertainty))
+}
+
+/**
+ * Calcule le niveau de confiance de la VMA (high, medium, low)
+ * Basé sur :
+ * - Le nombre d'efforts récents
+ * - La cohérence des vitesses
+ */
+export function calculateVMAConfidence(
+  runActs: ActivitySummary[],
+  _ref: RunningEffort
+): "high" | "medium" | "low" {
+  if (runActs.length === 0) return "low"
+
+  // Calcul de la cohérence des vitesses
+  const efforts = runActs
+    .map((a) => {
+      const tFlat = flatRunningTime(a)
+      if (!tFlat) return null
+      const dKm = a.distance_m / 1000
+      const vFlat = dKm / (tFlat / 3600)
+      return vFlat
+    })
+    .filter(Boolean) as number[]
+
+  if (efforts.length < 2) {
+    // Très peu d'efforts : confiance faible
+    return runActs.length >= 3 ? "medium" : "low"
+  }
+
+  // Calcul de l'écart-type normalisé (coefficient de variation)
+  const meanSpeed = efforts.reduce((a, b) => a + b) / efforts.length
+  const variance = efforts.reduce((sum, v) => sum + Math.pow(v - meanSpeed, 2), 0) / efforts.length
+  const stdDev = Math.sqrt(variance)
+  const coeffVar = stdDev / meanSpeed // 0 = parfait, > 0.1 = assez dispersé
+
+  // Grille de confiance
+  if (runActs.length >= 6 && coeffVar < 0.08) {
+    return "high" // Beaucoup d'efforts, cohérence excellente
+  } else if (runActs.length >= 4 && coeffVar < 0.12) {
+    return "high" // Assez d'efforts, bonne cohérence
+  } else if (runActs.length >= 3 || coeffVar < 0.1) {
+    return "medium" // Quelques efforts ou cohérence decent
+  } else {
+    return "low" // Peu d'efforts ou très dispersés
+  }
+}
+
+/**
+ * Prédit les performances de course à pied, incluant la VMA avec confiance et incertitude
  */
 export function predictRunningPerformance(
   activities: ActivitySummary[],
   ctl: number,
   atl: number
-): Record<string, number> | null {
+): (Record<string, number | string> & { vma?: number; vmaConfidence?: "high" | "medium" | "low"; vmaUncertainty?: number }) | null {
   const cutoff = new Date()
   cutoff.setDate(cutoff.getDate() - 42)
 
@@ -144,7 +242,14 @@ export function predictRunningPerformance(
 
   const formDelta = computeFormDelta(ctl, atl)
   const k = estimateRiegelExponent([refRun])
-  return predictRunningTimes(refRun, k, formDelta)
+  const predictions = predictRunningTimes(refRun, k, formDelta)
+  
+  // Calcul de la VMA avec confiance et incertitude
+  const vma = calculateVMA(refRun)
+  const vmaConfidence = calculateVMAConfidence(runActs, refRun)
+  const vmaUncertainty = calculateVMAUncertainty(refRun, runActs.length)
+  
+  return { ...predictions, vma, vmaConfidence, vmaUncertainty }
 }
 
 /**

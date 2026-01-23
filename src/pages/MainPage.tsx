@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useMemo } from "react"
 import { useUser } from "../contexts/UserContext"
 import type { ActivitySummary } from "../types/Activity"
 import { predictPerformance } from "../utils/guess"
@@ -43,7 +43,7 @@ export default function MainPage({
   activities: ActivitySummary[]
   onImport: () => void
 }) {
-  const [helpOpen, setHelpOpen] = useState(false)
+  // const [helpOpen, setHelpOpen] = useState(false)
   const { objectives } = useUser()
   const today = startOfDay(new Date())
 
@@ -624,6 +624,21 @@ export default function MainPage({
               <div style={{ marginBottom: 15, paddingBottom: 12, borderBottom: "1px solid #f0f0f0" }}>
                 <strong>Course à pied</strong>
                 <div style={{ fontSize: 13 }}>
+                  <div>VMA estimée: <span style={{ fontWeight: 600 }}>{((performance.running as Record<string, number>).vma || 0).toFixed(2)} km/h</span></div>
+                  <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>
+                    (Vitesse Maximale Aérobie)
+                  </div>
+                  <div style={{ fontSize: 11, display: "flex", gap: 12, marginBottom: 8, color: "#888" }}>
+                    <span>
+                      Confiance: <span style={{ color: "#888" }}>
+                        {((performance.running as Record<string, string | number>).vmaConfidence || "medium")}
+                      </span>
+                    </span>
+                    <span>
+                      Incertitude: <strong>±{((performance.running as Record<string, number>).vmaUncertainty || 15).toFixed(0)}%</strong>
+                    </span>
+                  </div>
+                  <div style={{ borderTop: "1px solid #f0f0f0", paddingTop: 8, marginBottom: 8 }} />
                   <div>5 km: {formatDuration((performance.running as Record<string, number>)["5km"])}</div>
                   <div>10 km: {formatDuration((performance.running as Record<string, number>)["10km"])}</div>
                   <div>21.1 km: {formatDuration((performance.running as Record<string, number>)["21.1km"])}</div>

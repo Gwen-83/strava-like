@@ -447,8 +447,8 @@ function dateToISOString(date: Date): string {
 }
 
 /**
- * Parses ISO date string to Date
+ * Parses ISO date string to Date (local time, not UTC)
  */
 function parseDate(dateStr: string): Date {
-  return new Date(dateStr + "T00:00:00Z");
+  return new Date(dateStr + "T00:00:00");
 }

@@ -6,6 +6,7 @@ import { auth } from "../firebase"
 import { getLastImportDate, updateLastImportDate } from "../services/users"
 import { mapStravaToSummary, mapStravaToDetails } from "../mappers/StravaMappers"
 import { upsertActivityDetails } from "../services/activityDetails"
+import { calculateActivityTrainingLoad } from "../utils/trainingLoadCalculator"
 
 function StravaCallback() {
   const navigate = useNavigate()
@@ -24,6 +25,16 @@ function StravaCallback() {
 
       const userId = auth.currentUser.uid
       const lastImport = await getLastImportDate(userId)
+
+      // Calculer les vitesses de référence une fois pour tous les imports
+      // (utiliser une estimation par défaut si pas d'historique)
+      const refSpeeds = {
+        "Cyclisme": 25,
+        "Course": 12,
+        "Marche": 5,
+        "Randonnée": 4,
+        "Autre": 10
+      }
 
       const potentialDuplicates: { imported: any; candidates: any[] }[] = []
       const potentialSuspects: { raw: any; summary: any; reasons: string[] }[] = []
@@ -44,6 +55,9 @@ function StravaCallback() {
       }
 
       const summary = mapStravaToSummary(raw, userId)
+      
+      // Calculer la charge d'entraînement
+      summary.load = calculateActivityTrainingLoad(summary, refSpeeds)
 
       // Vérifier suspicion avant insertion
       try {
@@ -91,6 +105,7 @@ function StravaCallback() {
         console.log("[import] inserted activity", { externalId: summary.externalId, activityId })
 
         const details = mapStravaToDetails(raw, userId, activityId)
+        details.load = summary.load // Ajouter la charge d'entraînement calculée
         await upsertActivityDetails(details)
         console.log("[import] upserted details", { activityId })
       } catch (e) {

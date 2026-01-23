@@ -1,5 +1,6 @@
 import type { ActivityDetails } from "../types/Activity"
 import { normalizeSport } from "../utils/normalizeSport"
+import { calculateActivityTrainingLoad } from "../utils/trainingLoadCalculator"
 
 // Utilitaires pour parser GPX
 export async function parseGPXFile(file: File): Promise<ActivityDetails> {
@@ -140,6 +141,16 @@ export async function parseGPXFile(file: File): Promise<ActivityDetails> {
     },
     geoPoints,
   }
+
+  // Calculer la charge d'entraînement avec des vitesses de référence par défaut
+  const refSpeeds = {
+    "Cyclisme": 25,
+    "Course": 12,
+    "Marche": 5,
+    "Randonnée": 4,
+    "Autre": 10
+  }
+  activity.load = calculateActivityTrainingLoad(activity, refSpeeds)
 
   return activity
 }

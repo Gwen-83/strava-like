@@ -54,6 +54,7 @@ export async function upsertActivitySummary(
       max_speed_ms: activity.max_speed_ms ?? null,
       avg_watts: activity.avg_watts ?? null,
       energy_kj: activity.energy_kj ?? null,
+      load: activity.load ?? null,
 
       has_gps: activity.has_gps,
       has_streams: activity.has_streams,
@@ -108,6 +109,7 @@ export async function findSimilarActivities(
       max_speed_ms: data.max_speed_ms ?? undefined,
       avg_watts: data.avg_watts ?? undefined,
       energy_kj: data.energy_kj ?? undefined,
+      load: data.load ?? undefined,
       has_gps: data.has_gps,
       has_streams: data.has_streams,
       has_power: data.has_power,
@@ -169,6 +171,7 @@ export async function getUserActivitySummaries(
       max_speed_ms: data.max_speed_ms ?? undefined,
       avg_watts: data.avg_watts ?? undefined,
       energy_kj: data.energy_kj ?? undefined,
+      load: data.load ?? undefined,
 
       has_gps: data.has_gps,
       has_streams: data.has_streams,

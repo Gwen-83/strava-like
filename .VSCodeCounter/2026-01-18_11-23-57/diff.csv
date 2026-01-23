@@ -1,0 +1,8 @@
+"filename", "language", "TypeScript", "TypeScript JSX", "PostCSS", "comment", "blank", "total"
+"c:\strava-like\src\pages\MainPage.tsx", "TypeScript JSX", 0, 14, 0, 1, 0, 15
+"c:\strava-like\src\pages\strava-callback.tsx", "TypeScript JSX", 0, 10, 0, 3, 2, 15
+"c:\strava-like\src\services\activitiesSummary.ts", "TypeScript", 3, 0, 0, 0, 0, 3
+"c:\strava-like\src\services\fileImportParser.ts", "TypeScript", 9, 0, 0, 1, 1, 11
+"c:\strava-like\src\styles\comparisons.css", "PostCSS", 0, 0, 108, 1, 29, 138
+"c:\strava-like\src\utils\performanceRunning.ts", "TypeScript", 56, 0, 0, 35, 14, 105
+"Total", "-", 68, 24, 108, 41, 46, 287

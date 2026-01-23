@@ -216,3 +216,140 @@
   background: #111216;
   color: #ffffff;
 }
+
+/* Benchmark Personal Section */
+.benchmark-section {
+  margin-bottom: 32px;
+  padding: 0;
+}
+
+.benchmark-section .section-title {
+  margin-bottom: 16px;
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.benchmark-section .benchmark-container {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.04) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.benchmark-section .benchmark-header {
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+.benchmark-section .header-content h2 {
+  color: #fff;
+}
+
+.benchmark-section .header-subtitle {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.benchmark-section .window-badge {
+  background: rgba(0, 102, 204, 0.2);
+  border-color: rgba(0, 102, 204, 0.4);
+  color: #66b3ff;
+}
+
+.benchmark-section .insights-section {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.benchmark-section .insights-section h3 {
+  color: #fff;
+}
+
+.benchmark-section .insight-item {
+  background: rgba(255, 255, 255, 0.08);
+  border-left-color: #66b3ff;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.benchmark-section .metrics-section h3 {
+  color: #fff;
+}
+
+.benchmark-section .metric-card {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.benchmark-section .metric-card.zone-very-low {
+  background: rgba(211, 47, 47, 0.15);
+  border-left-color: #ff6b6b;
+}
+
+.benchmark-section .metric-card.zone-low {
+  background: rgba(245, 124, 0, 0.15);
+  border-left-color: #ff9e64;
+}
+
+.benchmark-section .metric-card.zone-normal {
+  background: rgba(56, 142, 60, 0.15);
+  border-left-color: #51cf66;
+}
+
+.benchmark-section .metric-card.zone-high {
+  background: rgba(25, 118, 210, 0.15);
+  border-left-color: #74b9ff;
+}
+
+.benchmark-section .metric-card.zone-very-high {
+  background: rgba(123, 31, 162, 0.15);
+  border-left-color: #da77f2;
+}
+
+.benchmark-section .metric-header {
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+.benchmark-section .metric-label {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.benchmark-section .value {
+  color: #fff;
+}
+
+.benchmark-section .reference-label {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.benchmark-section .reference-value {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.benchmark-section .benchmark-legend {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.benchmark-section .benchmark-legend h4 {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.benchmark-section .legend-item {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.benchmark-section .benchmark-disclaimer {
+  background: rgba(0, 102, 204, 0.15);
+  border-color: rgba(0, 102, 204, 0.3);
+  color: rgba(102, 179, 255, 0.9);
+}
+
+.benchmark-section .btn-refresh {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.benchmark-section .btn-refresh:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(102, 179, 255, 0.5);
+}
